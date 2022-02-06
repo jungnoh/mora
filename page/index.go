@@ -12,11 +12,16 @@ func (p PageIndex) ApplyDailyCount(dailyCount PageIndex) {
 	}
 }
 
-type CandleSet struct {
+type CandleSetWithoutYear struct {
 	MarketCode   string
 	Code         string
 	CandleLength uint32
 	Year         uint16
+}
+
+type CandleSet struct {
+	CandleSetWithoutYear
+	Year uint16
 }
 
 func (p CandleSet) UniqueKey() string {

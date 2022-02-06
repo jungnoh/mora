@@ -33,11 +33,10 @@ func (m *RWMutexMap) Get(key string) *sync.RWMutex {
 }
 
 type LockSet struct {
-	Disk        RWMutexMap
-	Log         RWMutexMap
-	Memory      RWMutexMap
-	FlushRegion MutexMap
-	MemoryLL    sync.RWMutex
-	WalTxId     sync.Mutex
-	WalFlush    sync.Mutex
+	Disk      RWMutexMap
+	Log       RWMutexMap
+	Memory    RWMutexMap
+	MemoryMap sync.RWMutex
+	MemoryLL  sync.RWMutex
+	WAL       sync.Mutex
 }

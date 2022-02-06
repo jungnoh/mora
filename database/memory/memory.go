@@ -10,9 +10,10 @@ type Memory struct {
 	Config *util.Config
 	Lock   *util.LockSet
 
-	Map        map[string]MemoryPage
+	Map        map[string]*MemoryPage
 	DirtyCount int
 	CleanCount int
+
 	DirtyStart *MemoryPage
 	DirtyEnd   *MemoryPage
 	CleanStart *MemoryPage
@@ -31,17 +32,30 @@ type MemoryPage struct {
 }
 
 func (m *Memory) Exists(key string) bool {
+	m.Lock.MemoryMap.RLock()
+	defer m.Lock.MemoryMap.RUnlock()
 	_, ok := m.Map[key]
 	return ok
 }
 
-func (m *Memory) Access(key string) *page.Page {
+func (m *Memory) AccessMemoryPage(key string) *MemoryPage {
+	m.Lock.MemoryMap.RLock()
 	page, ok := m.Map[key]
+	m.Lock.MemoryMap.RUnlock()
 	if ok {
-		return &page.Content
+		m.SetAsClean(page)
+		return page
 	} else {
 		return nil
 	}
+}
+
+func (m *Memory) Access(key string) *page.Page {
+	result := m.AccessMemoryPage(key)
+	if result == nil {
+		return nil
+	}
+	return &result.Content
 }
 
 func (m *Memory) Evict() (evicted bool) {
@@ -68,4 +82,35 @@ func (m *Memory) Evict() (evicted bool) {
 	delete(m.Map, evictingBlock.Key)
 	evicted = true
 	return
+}
+
+func (m *Memory) EvictNeeded() bool {
+	m.Lock.MemoryLL.RLock()
+	defer m.Lock.MemoryLL.RUnlock()
+	return m.CleanCount > m.Config.MaxCleanBlocks
+}
+
+func (m *Memory) Insert(page page.Page) error {
+	if m.EvictNeeded() {
+		m.Evict()
+	}
+
+	pageKey := page.UniqueKey()
+	if m.Exists(pageKey) {
+		return nil
+	}
+
+	m.Lock.MemoryLL.Lock()
+	defer m.Lock.MemoryLL.Unlock()
+
+	m.Lock.MemoryMap.Lock()
+	defer m.Lock.MemoryMap.Lock()
+	m.Map[pageKey] = &MemoryPage{
+		Key:             pageKey,
+		Content:         page,
+		LastFlushedTxId: wal.TxID(page.Header.LastTxId),
+	}
+	m.addToCleanLL(m.Map[pageKey])
+
+	return nil
 }

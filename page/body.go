@@ -11,7 +11,7 @@ type PageBodyBlock struct {
 	Timestamp       uint64
 	TimestampOffset uint32
 
-	bitFields uint32
+	BitFields uint32
 	Open      float64
 	High      float64
 	Low       float64
@@ -24,7 +24,7 @@ func NewPageBodyBlock(year uint16, candle common.Candle) PageBodyBlock {
 	return PageBodyBlock{
 		Timestamp:       ts,
 		TimestampOffset: uint32(int64(ts) - common.GetStartOfYearTimestamp(int(year))),
-		bitFields:       0,
+		BitFields:       candle.BitFields,
 		Open:            candle.Open,
 		High:            candle.High,
 		Low:             candle.Low,
@@ -45,7 +45,7 @@ func ReadPageBodyBlock(header PageHeader, r io.Reader) (PageBodyBlock, error) {
 
 	block := PageBodyBlock{
 		TimestampOffset: binary.LittleEndian.Uint32(blockBin[0:4]),
-		bitFields:       binary.BigEndian.Uint32(blockBin[4:8]),
+		BitFields:       binary.BigEndian.Uint32(blockBin[4:8]),
 		Open:            common.Float64frombytes(blockBin[8:16]),
 		High:            common.Float64frombytes(blockBin[16:24]),
 		Low:             common.Float64frombytes(blockBin[24:32]),
@@ -60,7 +60,7 @@ func (p PageBodyBlock) Write(w io.Writer) (err error) {
 	if err = binary.Write(w, binary.LittleEndian, p.TimestampOffset); err != nil {
 		return
 	}
-	if err = binary.Write(w, binary.BigEndian, p.bitFields); err != nil {
+	if err = binary.Write(w, binary.BigEndian, p.BitFields); err != nil {
 		return
 	}
 	if err = binary.Write(w, binary.LittleEndian, p.Open); err != nil {

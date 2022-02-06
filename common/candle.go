@@ -11,6 +11,7 @@ type Candle struct {
 	Low       float64
 	Close     float64
 	Volume    float64
+	BitFields uint32
 }
 
 func (c CandleList) Len() int {
@@ -21,4 +22,16 @@ func (c CandleList) Swap(i, j int) {
 }
 func (c CandleList) Less(i, j int) bool {
 	return c[i].Timestamp.Before(c[j].Timestamp)
+}
+
+func SplitCandlesByYear(candles CandleList) map[uint16]CandleList {
+	years := make(map[uint16]CandleList)
+	for i := range candles {
+		year := uint16(candles[i].Timestamp.Year())
+		if _, ok := years[year]; !ok {
+			years[year] = make(CandleList, 0)
+		}
+		years[year] = append(years[year], candles[i])
+	}
+	return years
 }
