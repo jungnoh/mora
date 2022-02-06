@@ -6,13 +6,14 @@ import (
 	"os"
 	"path"
 
+	"github.com/jungnoh/mora/database/util"
 	"github.com/jungnoh/mora/page"
 	"github.com/pkg/errors"
 )
 
 type Disk struct {
-	Config *Config
-	Lock   *LockSet
+	Config *util.Config
+	Lock   *util.LockSet
 }
 
 func (p *Disk) candleFolder(marketCode string, candleLength uint32) string {

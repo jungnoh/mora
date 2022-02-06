@@ -1,6 +1,8 @@
 package page
 
 import (
+	"io"
+
 	"github.com/jungnoh/mora/common"
 	"github.com/pkg/errors"
 )
@@ -40,4 +42,13 @@ func (c PageBodyBlockList) CreateIndex() (PageIndex, error) {
 	}
 	index.ApplyDailyCount(dailyCount)
 	return index, nil
+}
+
+func (c PageBodyBlockList) Write(w io.Writer) error {
+	for _, block := range c {
+		if err := block.Write(w); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -1,5 +1,7 @@
 package page
 
+import "fmt"
+
 type PageIndex []uint32
 
 func (p PageIndex) ApplyDailyCount(dailyCount PageIndex) {
@@ -8,4 +10,15 @@ func (p PageIndex) ApplyDailyCount(dailyCount PageIndex) {
 		culSum += dailyCount[i-1]
 		p[i] += culSum
 	}
+}
+
+type CandleSet struct {
+	MarketCode   string
+	Code         string
+	CandleLength uint32
+	Year         uint16
+}
+
+func (p CandleSet) UniqueKey() string {
+	return fmt.Sprintf("%s^%s^%d^%d", p.MarketCode, p.Code, p.CandleLength, p.Year)
 }

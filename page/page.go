@@ -1,6 +1,7 @@
 package page
 
 import (
+	"fmt"
 	"io"
 	"sort"
 
@@ -111,4 +112,8 @@ func (p *Page) merge(candles common.CandleList) error {
 	p.Header.Count = uint32(len(newBody))
 
 	return nil
+}
+
+func (p Page) UniqueKey() string {
+	return fmt.Sprintf("%s^%s^%d^%d", p.Header.MarketCode, p.Header.Code, p.Header.CandleLength, p.Header.Year)
 }
