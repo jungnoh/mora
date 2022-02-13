@@ -17,6 +17,8 @@ func NewPageBodyBlockList(year uint16, candles []common.Candle) PageBodyBlockLis
 	return result
 }
 
+// Implmentation for sort.Interface
+
 func (c PageBodyBlockList) Len() int {
 	return len(c)
 }
@@ -44,8 +46,22 @@ func (c PageBodyBlockList) CreateIndex() (PageIndex, error) {
 	return index, nil
 }
 
-func (c PageBodyBlockList) Write(w io.Writer) error {
-	for _, block := range c {
+// Implementation for common.BinaryReadWriter
+
+func (p *PageBodyBlockList) Read(count uint32, r io.Reader) error {
+	*p = make([]PageBodyBlock, 0, count)
+	for i := uint32(0); i < count; i++ {
+		block := PageBodyBlock{}
+		if err := block.Read(0, r); err != nil {
+			return err
+		}
+		*p = append(*p, block)
+	}
+	return nil
+}
+
+func (c *PageBodyBlockList) Write(w io.Writer) error {
+	for _, block := range *c {
 		if err := block.Write(w); err != nil {
 			return err
 		}

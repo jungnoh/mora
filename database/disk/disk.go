@@ -39,8 +39,8 @@ func (d Disk) ReadHeader(set page.CandleSet) (page.PageHeader, error) {
 		return page.PageHeader{}, errors.Wrap(err, "disk ReadHeader failed")
 	}
 	defer f.Close()
-	header, err := page.ReadPageHeader(f)
-	if err != nil {
+	header := page.PageHeader{}
+	if err := header.Read(0, f); err != nil {
 		return page.PageHeader{}, errors.Wrap(err, "disk ReadHeader failed")
 	}
 	return header, nil
@@ -57,11 +57,11 @@ func (d Disk) Read(set page.CandleSet) (page.Page, error) {
 		return page.Page{}, errors.Wrap(err, "disk Read failed")
 	}
 	defer f.Close()
-	result, err := page.ReadPage(f)
-	if err != nil {
-		return page.Page{}, errors.Wrap(err, "disk Read failed")
+	page := page.Page{}
+	if err := page.Read(0, f); err != nil {
+		return page, errors.Wrap(err, "disk Read failed")
 	}
-	return result, nil
+	return page, nil
 }
 
 func (d Disk) Write(set page.CandleSet, content page.Page) error {

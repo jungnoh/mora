@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/jungnoh/mora/common"
+	"github.com/jungnoh/mora/page"
 	"github.com/pkg/errors"
 )
 
@@ -19,57 +20,55 @@ type WalInsertEntry struct {
 	Candles      []common.TimestampCandle
 }
 
-func readTimestampCandle(r io.Reader) (common.TimestampCandle, error) {
-	bin := make([]byte, 48)
-	n, err := r.Read(bin)
-	if uint32(n) < 48 {
-		return common.TimestampCandle{}, io.EOF
-	}
-	if err != nil {
-		return common.TimestampCandle{}, err
-	}
-	return common.TimestampCandle{
-		Timestamp: int64(binary.LittleEndian.Uint32(bin[0:8])),
-		TimelessCandle: common.TimelessCandle{
-			BitFields: binary.BigEndian.Uint32(bin[8:12]),
-			Open:      common.Float64frombytes(bin[12:16]),
-			High:      common.Float64frombytes(bin[16:24]),
-			Low:       common.Float64frombytes(bin[24:32]),
-			Close:     common.Float64frombytes(bin[32:40]),
-			Volume:    common.Float64frombytes(bin[40:48]),
-		},
-	}, nil
-}
-
-func readInsertEntry(dataSize uint32, r io.Reader) (WalInsertEntry, error) {
-	if dataSize < walInsertEntryHeadSize || (dataSize-walInsertEntryHeadSize)%48 != 0 {
-		return WalInsertEntry{}, errors.New("wrong data size")
+func (e *WalInsertEntry) Read(size uint32, r io.Reader) error {
+	if size < walInsertEntryHeadSize || (size-walInsertEntryHeadSize)%48 != 0 {
+		return errors.New("wrong data size")
 	}
 	headerBin := make([]byte, walInsertEntryHeadSize)
 	n, err := r.Read(headerBin)
 	if uint32(n) < walInsertEntryHeadSize {
-		return WalInsertEntry{}, io.EOF
+		return io.EOF
 	}
 	if err != nil {
-		return WalInsertEntry{}, err
+		return err
 	}
 
-	blockCount := (dataSize - walInsertEntryHeadSize) / 48
-	entry := WalInsertEntry{
-		Year:         binary.LittleEndian.Uint16(headerBin[0:2]),
-		CandleLength: binary.LittleEndian.Uint32(headerBin[2:6]),
-		MarketCode:   string(headerBin[6:16]),
-		Code:         string(headerBin[16:34]),
-		Count:        binary.LittleEndian.Uint32(headerBin[34:38]),
-		Candles:      make([]common.TimestampCandle, blockCount),
-	}
+	blockCount := (size - walInsertEntryHeadSize) / 48
+	e.Year = binary.LittleEndian.Uint16(headerBin[0:2])
+	e.CandleLength = binary.LittleEndian.Uint32(headerBin[2:6])
+	e.MarketCode = string(headerBin[6:16])
+	e.Code = string(headerBin[16:34])
+	e.Count = binary.LittleEndian.Uint32(headerBin[34:38])
+	e.Candles = make([]common.TimestampCandle, blockCount)
 	for i := uint32(0); i < blockCount; i++ {
-		candle, err := readTimestampCandle(r)
-		if err != nil {
-			return entry, nil
+		if err := e.Candles[i].Read(48, r); err != nil {
+			return err
 		}
-		entry.Candles[i] = candle
+	}
+	return nil
+}
+
+func (e *WalInsertEntry) Write(w io.Writer) (err error) {
+	if err = binary.Write(w, binary.LittleEndian, e.Year); err != nil {
+		return
+	}
+	if err = binary.Write(w, binary.LittleEndian, e.CandleLength); err != nil {
+		return
+	}
+	if err := common.WriteNullPaddedString(page.MAX_MARKET_CODE_LENGTH, e.MarketCode, w); err != nil {
+		return errors.Wrap(err, "failed to write market code")
+	}
+	if err := common.WriteNullPaddedString(page.MAX_CODE_LENGTH, e.Code, w); err != nil {
+		return errors.Wrap(err, "failed to write code")
+	}
+	if err = binary.Write(w, binary.LittleEndian, e.Count); err != nil {
+		return
+	}
+	for _, candle := range e.Candles {
+		if err = candle.Write(w); err != nil {
+			return
+		}
 	}
 
-	return entry, nil
+	return nil
 }

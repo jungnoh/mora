@@ -14,24 +14,22 @@ type Page struct {
 	Body   PageBodyBlockList
 }
 
-func ReadPage(r io.Reader) (Page, error) {
-	newPage := Page{}
-	header, err := ReadPageHeader(r)
-	if err != nil {
-		return Page{}, errors.Wrap(err, "failed to read page header")
+func (p *Page) Read(_ uint32, r io.Reader) error {
+	if err := p.Header.Read(0, r); err != nil {
+		return errors.Wrap(err, "failed to read page header")
 	}
-	newPage.Header = header
 
-	blocks := make([]PageBodyBlock, 0, header.Count)
-	for i := uint32(0); i < header.Count; i++ {
-		block, err := ReadPageBodyBlock(header, r)
-		if err != nil {
-			return Page{}, errors.Wrap(err, "failed to read page body")
+	blocks := make([]PageBodyBlock, 0, p.Header.Count)
+	for i := uint32(0); i < p.Header.Count; i++ {
+		block := PageBodyBlock{}
+		if err := block.Read(0, r); err != nil {
+			return errors.Wrap(err, "failed to read page body")
 		}
+		block.SetYear(p.Header.Year)
 		blocks = append(blocks, block)
 	}
-	newPage.Body = blocks
-	return newPage, nil
+	p.Body = blocks
+	return nil
 }
 
 func (p *Page) Add(candles common.CandleList) error {
