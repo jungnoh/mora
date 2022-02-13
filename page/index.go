@@ -16,7 +16,6 @@ type CandleSetWithoutYear struct {
 	MarketCode   string
 	Code         string
 	CandleLength uint32
-	Year         uint16
 }
 
 type CandleSet struct {

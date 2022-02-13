@@ -22,7 +22,3 @@ func (w WriteAheadLog) NextTxID() TxID {
 	w.TxID++
 	return w.TxID
 }
-
-func (w WriteAheadLog) Write(txID TxID, set page.CandleSet, candles []common.Candle) error {
-	return nil
-}

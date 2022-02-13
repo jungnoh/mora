@@ -4,14 +4,23 @@ import "time"
 
 type CandleList []Candle
 
-type Candle struct {
-	Timestamp time.Time
+type TimelessCandle struct {
 	Open      float64
 	High      float64
 	Low       float64
 	Close     float64
 	Volume    float64
 	BitFields uint32
+}
+
+type Candle struct {
+	TimelessCandle
+	Timestamp time.Time
+}
+
+type TimestampCandle struct {
+	TimelessCandle
+	Timestamp int64
 }
 
 func (c CandleList) Len() int {

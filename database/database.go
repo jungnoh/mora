@@ -69,10 +69,10 @@ func (d *Database) writePage(set page.CandleSet, candles []common.Candle) error 
 
 	pageLock.Lock()
 	defer pageLock.Unlock()
-	d.lock.WAL.Lock()
-	defer d.lock.WAL.Unlock()
+	// d.lock.WAL.Lock()
+	// defer d.lock.WAL.Unlock()
 
-	txID := d.Wal.NextTxID()
+	// txID := d.Wal.NextTxID()
 	_, err := d.loadPage(set, false)
 	if err != nil {
 		return errors.Wrap(err, "writePage failed: loading page")
@@ -82,9 +82,9 @@ func (d *Database) writePage(set page.CandleSet, candles []common.Candle) error 
 		return errors.New("writePage failed: memPage is nil")
 	}
 
-	if err := d.Wal.Write(txID, set, candles); err != nil {
-		return errors.Wrap(err, "writePage failed: write to WAL")
-	}
+	// if err := d.Wal.Write(txID, set, candles); err != nil {
+	// 	return errors.Wrap(err, "writePage failed: write to WAL")
+	// }
 	if err := d.Mem.Write(set, candles); err != nil {
 		return errors.Wrap(err, "writePage failed: write to memory")
 	}
