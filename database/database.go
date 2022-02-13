@@ -91,8 +91,8 @@ func (d *Database) writePage(set page.CandleSet, candles []common.Candle) error 
 	return nil
 }
 
-func (d *Database) Write(set page.CandleSetWithoutYear, candles []common.Candle) error {
-	years := common.SplitCandlesByYear(candles)
+func (d *Database) Write(set page.CandleSetWithoutYear, candles common.CandleList) error {
+	years := candles.SplitByYear()
 	wg := sync.WaitGroup{}
 	wg.Add(len(years))
 

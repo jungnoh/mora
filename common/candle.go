@@ -35,14 +35,14 @@ func (c CandleList) Less(i, j int) bool {
 	return c[i].Timestamp.Before(c[j].Timestamp)
 }
 
-func SplitCandlesByYear(candles CandleList) map[uint16]CandleList {
+func (c CandleList) SplitByYear() map[uint16]CandleList {
 	years := make(map[uint16]CandleList)
-	for i := range candles {
-		year := uint16(candles[i].Timestamp.Year())
+	for i := range c {
+		year := uint16(c[i].Timestamp.Year())
 		if _, ok := years[year]; !ok {
 			years[year] = make(CandleList, 0)
 		}
-		years[year] = append(years[year], candles[i])
+		years[year] = append(years[year], c[i])
 	}
 	return years
 }
