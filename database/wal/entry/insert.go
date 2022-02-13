@@ -1,4 +1,4 @@
-package wal
+package entry
 
 import (
 	"encoding/binary"
@@ -11,7 +11,7 @@ import (
 
 const walInsertEntryHeadSize uint32 = 38
 
-type WalInsertEntry struct {
+type WalInsertContent struct {
 	Year         uint16
 	CandleLength uint32
 	MarketCode   string
@@ -20,7 +20,7 @@ type WalInsertEntry struct {
 	Candles      []common.TimestampCandle
 }
 
-func (e *WalInsertEntry) Read(size uint32, r io.Reader) error {
+func (e *WalInsertContent) Read(size uint32, r io.Reader) error {
 	if size < walInsertEntryHeadSize || (size-walInsertEntryHeadSize)%48 != 0 {
 		return errors.New("wrong data size")
 	}
@@ -48,7 +48,7 @@ func (e *WalInsertEntry) Read(size uint32, r io.Reader) error {
 	return nil
 }
 
-func (e *WalInsertEntry) Write(w io.Writer) (err error) {
+func (e *WalInsertContent) Write(w io.Writer) (err error) {
 	if err = binary.Write(w, binary.LittleEndian, e.Year); err != nil {
 		return
 	}
@@ -71,4 +71,8 @@ func (e *WalInsertEntry) Write(w io.Writer) (err error) {
 	}
 
 	return nil
+}
+
+func (e *WalInsertContent) BinarySize() uint32 {
+	return walInsertEntryHeadSize + uint32(48*len(e.Candles))
 }

@@ -13,6 +13,11 @@ type BinaryReadWriter interface {
 	Write(w io.Writer) error
 }
 
+type SizableBinaryReadWriter interface {
+	BinaryReadWriter
+	BinarySize() uint32
+}
+
 func Float64frombytes(bytes []byte) float64 {
 	bits := binary.LittleEndian.Uint64(bytes)
 	float := math.Float64frombits(bits)
