@@ -59,14 +59,6 @@ func (p *PageHeader) Read(size uint32, r io.Reader) error {
 }
 
 func (p *PageHeader) Write(w io.Writer) error {
-	encodedMarketCode := []byte(p.MarketCode)
-	encodedCode := []byte(p.Code)
-	if len(encodedMarketCode) > MAX_MARKET_CODE_LENGTH {
-		return errors.Errorf("code is too long (maximum %d, got %d)", MAX_MARKET_CODE_LENGTH, len(encodedMarketCode))
-	}
-	if len(encodedCode) > MAX_CODE_LENGTH {
-		return errors.Errorf("code is too long (maximum %d, got %d)", MAX_CODE_LENGTH, len(encodedCode))
-	}
 	if len(p.Index) > INDEX_COUNT {
 		return errors.Errorf("index array is too long (maximum %d, got %d)", INDEX_COUNT, len(p.Index))
 	}
@@ -95,17 +87,11 @@ func (p *PageHeader) Write(w io.Writer) error {
 	if err := binary.Write(w, binary.LittleEndian, p.LastTxId); err != nil {
 		return err
 	}
-	if _, err := w.Write(encodedMarketCode); err != nil {
-		return err
+	if err := common.WriteNullPaddedString(MAX_MARKET_CODE_LENGTH, p.MarketCode, w); err != nil {
+		return errors.Wrap(err, "failed to write market code")
 	}
-	if _, err := w.Write(make([]byte, MAX_MARKET_CODE_LENGTH-len(encodedMarketCode))); err != nil {
-		return err
-	}
-	if _, err := w.Write(encodedCode); err != nil {
-		return err
-	}
-	if _, err := w.Write(make([]byte, MAX_CODE_LENGTH-len(encodedCode))); err != nil {
-		return err
+	if err := common.WriteNullPaddedString(MAX_CODE_LENGTH, p.Code, w); err != nil {
+		return errors.Wrap(err, "failed to write code")
 	}
 	for i := 0; i < INDEX_COUNT; i++ {
 		dataToWrite := p.Count
