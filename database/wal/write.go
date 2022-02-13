@@ -8,8 +8,3 @@ import (
 func (w WriteAheadLog) Write(txID TxID, set page.CandleSet, candles []common.Candle) error {
 	return nil
 }
-
-// func (w WriteAheadLog)
-
-type WriteAheadLogBuilder struct {
-}

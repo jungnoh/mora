@@ -10,12 +10,21 @@ import (
 
 type WalEntryContent interface {
 	common.SizableBinaryReadWriter
+	TypeId() uint32
 }
 
 type WalEntry struct {
 	TxID    uint64
 	Type    uint32
 	Content WalEntryContent
+}
+
+func NewWalEntry(txId uint64, content WalEntryContent) WalEntry {
+	return WalEntry{
+		TxID:    txId,
+		Type:    content.TypeId(),
+		Content: content,
+	}
 }
 
 func (e *WalEntry) Read(_ uint32, r io.Reader) error {

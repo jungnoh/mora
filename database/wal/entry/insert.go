@@ -20,6 +20,17 @@ type WalInsertContent struct {
 	Candles      []common.TimestampCandle
 }
 
+func NewWalInsertContent(set page.CandleSet, candles []common.TimestampCandle) WalInsertContent {
+	return WalInsertContent{
+		Year:         set.Year,
+		CandleLength: set.CandleLength,
+		MarketCode:   set.MarketCode,
+		Code:         set.Code,
+		Count:        uint32(len(candles)),
+		Candles:      candles,
+	}
+}
+
 func (e *WalInsertContent) Read(size uint32, r io.Reader) error {
 	if size < walInsertEntryHeadSize || (size-walInsertEntryHeadSize)%48 != 0 {
 		return errors.New("wrong data size")
@@ -75,4 +86,8 @@ func (e *WalInsertContent) Write(w io.Writer) (err error) {
 
 func (e *WalInsertContent) BinarySize() uint32 {
 	return walInsertEntryHeadSize + uint32(48*len(e.Candles))
+}
+
+func (e *WalInsertContent) TypeId() uint32 {
+	return ENTRYID_INSERT
 }

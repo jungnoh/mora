@@ -16,3 +16,7 @@ func (e *WalCommitContent) Write(w io.Writer) (err error) {
 func (e *WalCommitContent) BinarySize() uint32 {
 	return 0
 }
+
+func (e *WalCommitContent) TypeId() uint32 {
+	return ENTRYID_COMMIT
+}
