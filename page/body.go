@@ -33,30 +33,28 @@ func NewPageBodyBlock(year uint16, candle common.Candle) PageBodyBlock {
 	}
 }
 
-func ReadPageBodyBlock(header PageHeader, r io.Reader) (PageBodyBlock, error) {
+func (p *PageBodyBlock) Read(_ uint32, r io.Reader) error {
 	blockBin := make([]byte, BLOCK_WIDTH)
 	n, err := r.Read(blockBin)
 	if n < BLOCK_WIDTH {
-		return PageBodyBlock{}, io.EOF
+		return io.EOF
 	}
 	if err != nil {
-		return PageBodyBlock{}, err
+		return err
 	}
 
-	block := PageBodyBlock{
-		TimestampOffset: binary.LittleEndian.Uint32(blockBin[0:4]),
-		BitFields:       binary.BigEndian.Uint32(blockBin[4:8]),
-		Open:            common.Float64frombytes(blockBin[8:16]),
-		High:            common.Float64frombytes(blockBin[16:24]),
-		Low:             common.Float64frombytes(blockBin[24:32]),
-		Close:           common.Float64frombytes(blockBin[32:40]),
-		Volume:          common.Float64frombytes(blockBin[40:48]),
-	}
-	block.Timestamp = uint64(common.GetStartOfYearTimestamp(int(header.Year))) + uint64(block.TimestampOffset)
-	return block, nil
+	p.TimestampOffset = binary.LittleEndian.Uint32(blockBin[0:4])
+	p.BitFields = binary.BigEndian.Uint32(blockBin[4:8])
+	p.Open = common.Float64frombytes(blockBin[8:16])
+	p.High = common.Float64frombytes(blockBin[16:24])
+	p.Low = common.Float64frombytes(blockBin[24:32])
+	p.Close = common.Float64frombytes(blockBin[32:40])
+	p.Volume = common.Float64frombytes(blockBin[40:48])
+
+	return nil
 }
 
-func (p PageBodyBlock) Write(w io.Writer) (err error) {
+func (p *PageBodyBlock) Write(w io.Writer) (err error) {
 	if err = binary.Write(w, binary.LittleEndian, p.TimestampOffset); err != nil {
 		return
 	}
@@ -79,4 +77,8 @@ func (p PageBodyBlock) Write(w io.Writer) (err error) {
 		return
 	}
 	return
+}
+
+func (p *PageBodyBlock) SetYear(year uint16) {
+	p.Timestamp = uint64(common.GetStartOfYearTimestamp(int(year))) + uint64(p.TimestampOffset)
 }

@@ -19,28 +19,6 @@ type WalInsertEntry struct {
 	Candles      []common.TimestampCandle
 }
 
-func readTimestampCandle(r io.Reader) (common.TimestampCandle, error) {
-	bin := make([]byte, 48)
-	n, err := r.Read(bin)
-	if uint32(n) < 48 {
-		return common.TimestampCandle{}, io.EOF
-	}
-	if err != nil {
-		return common.TimestampCandle{}, err
-	}
-	return common.TimestampCandle{
-		Timestamp: int64(binary.LittleEndian.Uint32(bin[0:8])),
-		TimelessCandle: common.TimelessCandle{
-			BitFields: binary.BigEndian.Uint32(bin[8:12]),
-			Open:      common.Float64frombytes(bin[12:16]),
-			High:      common.Float64frombytes(bin[16:24]),
-			Low:       common.Float64frombytes(bin[24:32]),
-			Close:     common.Float64frombytes(bin[32:40]),
-			Volume:    common.Float64frombytes(bin[40:48]),
-		},
-	}, nil
-}
-
 func readInsertEntry(dataSize uint32, r io.Reader) (WalInsertEntry, error) {
 	if dataSize < walInsertEntryHeadSize || (dataSize-walInsertEntryHeadSize)%48 != 0 {
 		return WalInsertEntry{}, errors.New("wrong data size")
@@ -64,11 +42,9 @@ func readInsertEntry(dataSize uint32, r io.Reader) (WalInsertEntry, error) {
 		Candles:      make([]common.TimestampCandle, blockCount),
 	}
 	for i := uint32(0); i < blockCount; i++ {
-		candle, err := readTimestampCandle(r)
-		if err != nil {
+		if err := entry.Candles[i].Read(48, r); err != nil {
 			return entry, nil
 		}
-		entry.Candles[i] = candle
 	}
 
 	return entry, nil
