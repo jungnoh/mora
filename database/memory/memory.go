@@ -2,7 +2,6 @@ package memory
 
 import (
 	"github.com/jungnoh/mora/database/util"
-	"github.com/jungnoh/mora/database/wal"
 	"github.com/jungnoh/mora/page"
 )
 
@@ -25,7 +24,7 @@ type MemoryPage struct {
 	InLL            bool
 	Dirty           bool
 	Content         page.Page
-	LastFlushedTxId wal.TxID
+	LastFlushedTxId uint64
 
 	PrevLL *MemoryPage
 	NextLL *MemoryPage
@@ -108,7 +107,7 @@ func (m *Memory) Insert(page page.Page) error {
 	m.Map[pageKey] = &MemoryPage{
 		Key:             pageKey,
 		Content:         page,
-		LastFlushedTxId: wal.TxID(page.Header.LastTxId),
+		LastFlushedTxId: page.Header.LastTxId,
 	}
 	m.addToCleanLL(m.Map[pageKey])
 
