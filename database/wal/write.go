@@ -5,6 +5,6 @@ import (
 	"github.com/jungnoh/mora/page"
 )
 
-func (w WriteAheadLog) Write(txID TxID, set page.CandleSet, candles []common.Candle) error {
+func (w WriteAheadLog) Write(txID uint64, set page.CandleSet, candles []common.Candle) error {
 	return nil
 }
