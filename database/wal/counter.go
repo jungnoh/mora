@@ -40,6 +40,13 @@ func (w *WalCounter) Open(file string) error {
 	return nil
 }
 
+func (w *WalCounter) Now() uint64 {
+	w.accessLock.Lock()
+	defer w.accessLock.Unlock()
+
+	return w.counter
+}
+
 func (w *WalCounter) Next() (uint64, error) {
 	w.accessLock.Lock()
 	defer w.accessLock.Unlock()

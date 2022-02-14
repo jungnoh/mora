@@ -5,6 +5,7 @@ import (
 	"github.com/jungnoh/mora/page"
 )
 
-func (w WriteAheadLog) Write(txID uint64, set page.CandleSet, candles []common.Candle) error {
-	return nil
+type WalWriter interface {
+	Insert(page.CandleSet, []common.TimestampCandle) error
+	Commit() error
 }

@@ -16,7 +16,13 @@ type WalWriteFile struct {
 	writeLock sync.Mutex
 }
 
-type WalWriteBuilder struct {
+func NewWalWriteFile(fd *os.File) WalWriteFile {
+	return WalWriteFile{
+		fd: fd,
+	}
+}
+
+type walWriteBuilder struct {
 	committed bool
 	txId      uint64
 	file      *WalWriteFile
@@ -47,15 +53,24 @@ func (w *WalWriteFile) Write(e entry.WalEntry) error {
 	return nil
 }
 
-func (w *WalWriteFile) NewBuilder(txId uint64) WalWriteBuilder {
-	return WalWriteBuilder{
+func (w *WalWriteFile) Close() error {
+	w.writeLock.Lock()
+	defer w.writeLock.Unlock()
+	if w.fd == nil {
+		return nil
+	}
+	return w.fd.Close()
+}
+
+func (w *WalWriteFile) NewBuilder(txId uint64) WalWriter {
+	return &walWriteBuilder{
 		committed: false,
 		txId:      txId,
 		file:      w,
 	}
 }
 
-func (w *WalWriteBuilder) Insert(set page.CandleSet, candles []common.TimestampCandle) error {
+func (w *walWriteBuilder) Insert(set page.CandleSet, candles []common.TimestampCandle) error {
 	if w.committed {
 		return errors.New("already committed")
 	}
@@ -64,7 +79,7 @@ func (w *WalWriteBuilder) Insert(set page.CandleSet, candles []common.TimestampC
 	return w.file.Write(newEntry)
 }
 
-func (w *WalWriteBuilder) Commit() error {
+func (w *walWriteBuilder) Commit() error {
 	if w.committed {
 		return errors.New("already committed")
 	}
