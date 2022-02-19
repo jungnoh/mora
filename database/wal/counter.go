@@ -19,6 +19,11 @@ func (w *WalCounter) Open(file string) error {
 	w.accessLock.Lock()
 	defer w.accessLock.Unlock()
 
+	if w.fd != nil {
+		w.fd.Close()
+		w.fd = nil
+	}
+
 	fd, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		return err

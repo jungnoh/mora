@@ -22,12 +22,29 @@ type WalPersister struct {
 	flushChan    chan<- bool
 }
 
+func (w *WalPersister) Setup() error {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	return w.RotateFile()
+}
+
+func (w *WalPersister) BeginEntry(txId uint64) (walPersisterBuilder, error) {
+	writer := w.currentFile.NewBuilder(txId)
+	return walPersisterBuilder{
+		writer:    writer,
+		persister: w,
+	}, nil
+}
+
 func (w *WalPersister) addWrittenCount() error {
 	w.writtenCount++
 	if w.writtenCount < MAX_COMMITTED_PAGES {
 		return nil
 	}
+	return w.RotateFile()
+}
 
+func (w *WalPersister) RotateFile() error {
 	fd, err := w.FileResolver.NewFile(w.Counter.Now())
 	if err != nil {
 		return err
@@ -40,20 +57,20 @@ func (w *WalPersister) addWrittenCount() error {
 }
 
 type walPersisterBuilder struct {
-	fileBuilder *walWriteBuilder
-	persister   *WalPersister
+	writer    WalWriter
+	persister *WalPersister
 }
 
 func (w *walPersisterBuilder) Insert(set page.CandleSet, candles []common.TimestampCandle) error {
 	w.persister.lock.Lock()
 	defer w.persister.lock.Unlock()
-	return w.fileBuilder.Insert(set, candles)
+	return w.writer.Insert(set, candles)
 }
 
 func (w *walPersisterBuilder) Commit() error {
 	w.persister.lock.Lock()
 	defer w.persister.lock.Unlock()
-	if err := w.fileBuilder.Commit(); err != nil {
+	if err := w.writer.Commit(); err != nil {
 		return err
 	}
 	if err := w.persister.addWrittenCount(); err != nil {
