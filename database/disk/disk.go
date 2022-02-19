@@ -24,8 +24,12 @@ func (p *Disk) folder(set page.CandleSet) string {
 	return path.Join(p.Config.Directory, fmt.Sprintf("%s/%d/%s", set.MarketCode, set.CandleLength, set.Code))
 }
 
-func (p *Disk) filePath(set page.CandleSet) string {
+func (p *Disk) filePathFromSet(set page.CandleSet) string {
 	return path.Join(p.Config.Directory, fmt.Sprintf("%s/%d/%s/%05d.ysf", set.MarketCode, set.CandleLength, set.Code, set.Year))
+}
+
+func (p *Disk) filePathFromHeader(header page.PageHeader) string {
+	return path.Join(p.Config.Directory, fmt.Sprintf("%s/%d/%s/%05d.ysf", header.MarketCode, header.CandleLength, header.Code, header.Year))
 }
 
 func (d Disk) ReadHeader(set page.CandleSet) (page.PageHeader, error) {
@@ -33,7 +37,7 @@ func (d Disk) ReadHeader(set page.CandleSet) (page.PageHeader, error) {
 	lock.RLock()
 	defer lock.RUnlock()
 
-	path := d.filePath(set)
+	path := d.filePathFromSet(set)
 	f, err := os.Open(path)
 	if err != nil {
 		return page.PageHeader{}, errors.Wrap(err, "disk ReadHeader failed")
@@ -51,7 +55,7 @@ func (d Disk) Read(set page.CandleSet) (page.Page, error) {
 	lock.RLock()
 	defer lock.RUnlock()
 
-	path := d.filePath(set)
+	path := d.filePathFromSet(set)
 	f, err := os.Open(path)
 	if err != nil {
 		return page.Page{}, errors.Wrap(err, "disk Read failed")
@@ -64,12 +68,12 @@ func (d Disk) Read(set page.CandleSet) (page.Page, error) {
 	return page, nil
 }
 
-func (d Disk) Write(set page.CandleSet, content page.Page) error {
-	lock := d.Lock.Disk.Get(set.UniqueKey())
+func (d Disk) Write(content page.Page) error {
+	lock := d.Lock.Disk.Get(content.UniqueKey())
 	lock.Lock()
 	defer lock.Unlock()
 
-	path := d.filePath(set)
+	path := d.filePathFromHeader(content.Header)
 	f, err := os.OpenFile(path, 0755, fs.FileMode(os.O_RDWR|os.O_TRUNC|os.O_CREATE))
 	if err != nil {
 		return errors.Wrap(err, "disk file open failed")

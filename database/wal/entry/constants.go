@@ -1,6 +1,8 @@
 package entry
 
+type EntryType uint32
+
 const (
-	ENTRYID_COMMIT uint32 = 1
-	ENTRYID_INSERT uint32 = 2
+	ENTRYID_COMMIT EntryType = 1
+	ENTRYID_INSERT EntryType = 2
 )

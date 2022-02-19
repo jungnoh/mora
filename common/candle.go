@@ -6,6 +6,16 @@ import (
 
 type CandleList []Candle
 
+type TimestampCandleList []TimestampCandle
+
+func (t TimestampCandleList) ToCandleList() []Candle {
+	result := make(CandleList, 0, len(t))
+	for _, v := range t {
+		result = append(result, v.ToCandle())
+	}
+	return result
+}
+
 type TimelessCandle struct {
 	Open      float64
 	High      float64
@@ -23,6 +33,13 @@ type Candle struct {
 type TimestampCandle struct {
 	TimelessCandle
 	Timestamp int64
+}
+
+func (c TimestampCandle) ToCandle() Candle {
+	return Candle{
+		TimelessCandle: c.TimelessCandle,
+		Timestamp:      time.Unix(c.Timestamp, 0).UTC(),
+	}
 }
 
 func (c CandleList) Len() int {

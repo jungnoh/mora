@@ -88,6 +88,27 @@ func (e *WalInsertContent) BinarySize() uint32 {
 	return walInsertEntryHeadSize + uint32(48*len(e.Candles))
 }
 
-func (e *WalInsertContent) TypeId() uint32 {
+func (e *WalInsertContent) TypeId() EntryType {
 	return ENTRYID_INSERT
+}
+
+func (e *WalInsertContent) TargetSets() []page.CandleSet {
+	return []page.CandleSet{
+		e.targetSet(),
+	}
+}
+
+func (e *WalInsertContent) Persist(pages *map[string]*page.Page) error {
+	return (*pages)[e.targetSet().UniqueKey()].Add(common.TimestampCandleList(e.Candles).ToCandleList())
+}
+
+func (e *WalInsertContent) targetSet() page.CandleSet {
+	return page.CandleSet{
+		Year: e.Year,
+		CandleSetWithoutYear: page.CandleSetWithoutYear{
+			CandleLength: e.CandleLength,
+			MarketCode:   e.MarketCode,
+			Code:         e.Code,
+		},
+	}
 }

@@ -5,17 +5,20 @@ import (
 	"io"
 
 	"github.com/jungnoh/mora/common"
+	"github.com/jungnoh/mora/page"
 	"github.com/pkg/errors"
 )
 
 type WalEntryContent interface {
 	common.SizableBinaryReadWriter
-	TypeId() uint32
+	TypeId() EntryType
+	TargetSets() []page.CandleSet
+	Persist(pages *map[string]*page.Page) error
 }
 
 type WalEntry struct {
 	TxID    uint64
-	Type    uint32
+	Type    EntryType
 	Content WalEntryContent
 }
 
@@ -39,7 +42,7 @@ func (e *WalEntry) Read(_ uint32, r io.Reader) error {
 
 	entrySize := binary.LittleEndian.Uint32(headerBytes[0:4])
 	e.TxID = binary.LittleEndian.Uint64(headerBytes[4:12])
-	e.Type = binary.LittleEndian.Uint32(headerBytes[12:16])
+	e.Type = EntryType(binary.LittleEndian.Uint32(headerBytes[12:16]))
 	switch e.Type {
 	case ENTRYID_COMMIT:
 		e.Content = &WalCommitContent{}
@@ -51,6 +54,26 @@ func (e *WalEntry) Read(_ uint32, r io.Reader) error {
 
 	if err := e.Content.Read(entrySize, r); err != nil {
 		return errors.Wrap(err, "failed to read entry content")
+	}
+	return nil
+}
+
+func (e *WalEntry) ReadOnlyHeader(_ uint32, r io.ReadSeeker) error {
+	headerBytes := make([]byte, 16)
+	n, err := r.Read(headerBytes)
+	if n < 16 {
+		return io.EOF
+	}
+	if err != nil {
+		return err
+	}
+
+	entrySize := binary.LittleEndian.Uint32(headerBytes[0:4])
+	e.TxID = binary.LittleEndian.Uint64(headerBytes[4:12])
+	e.Type = EntryType(binary.LittleEndian.Uint32(headerBytes[12:16]))
+
+	if _, err := r.Seek(int64(entrySize), io.SeekCurrent); err != nil {
+		return errors.Wrap(err, "failed to seek")
 	}
 	return nil
 }

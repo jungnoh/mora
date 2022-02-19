@@ -23,14 +23,15 @@ func (w WalFileResolver) Counter() string {
 }
 
 func (w WalFileResolver) AllFiles() ([]string, error) {
-	files, err := ioutil.ReadDir(w.dir())
+	directory := w.dir()
+	files, err := ioutil.ReadDir(directory)
 	if err != nil {
 		return []string{}, err
 	}
 	result := make([]string, 0, len(files))
 	for _, file := range files {
 		if !file.IsDir() && w.filenameIsWalLog(file.Name()) {
-			result = append(result, file.Name())
+			result = append(result, path.Join(directory, file.Name()))
 		}
 	}
 	return result, nil
