@@ -1,11 +1,13 @@
 package wal
 
 import (
+	"context"
 	"sync"
 
-	"github.com/jungnoh/mora/common"
+	"github.com/jungnoh/mora/database/command"
 	"github.com/jungnoh/mora/database/disk"
-	"github.com/jungnoh/mora/page"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 // TODO: Move to config
@@ -16,68 +18,104 @@ type WalPersister struct {
 	FileResolver *WalFileResolver
 	Counter      *WalCounter
 
-	lock         sync.Mutex
-	currentFile  WalWriteFile
-	writtenCount int
-	flushChan    chan<- bool
+	currentLog     WalWriteFile
+	currentLogLock sync.RWMutex
+	changeLogLock  sync.Mutex
+	writtenCount   int
+	rotateChan     chan string
+	flushChan      *chan<- bool
+	ctxCancel      context.CancelFunc
 }
 
 func (w *WalPersister) Setup() error {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-	return w.RotateFile()
+	if err := w.RotateFile(); err != nil {
+		return errors.Wrap(err, "WAL rotation failed!")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	w.ctxCancel = cancel
+	go w.watchRotateChan(ctx)
+	return nil
 }
 
-func (w *WalPersister) BeginEntry(txId uint64) (walPersisterBuilder, error) {
-	writer := w.currentFile.NewBuilder(txId)
+func (w *WalPersister) Close() {
+	w.currentLogLock.Lock()
+	defer w.currentLogLock.Unlock()
+
+	w.currentLog.Close()
+	close(*w.flushChan)
+	w.ctxCancel()
+}
+
+func (w *WalPersister) StartBuilder() (walPersisterBuilder, error) {
+	w.currentLogLock.RLock()
 	return walPersisterBuilder{
-		writer:    writer,
 		persister: w,
 	}, nil
 }
 
-func (w *WalPersister) addWrittenCount() error {
-	w.writtenCount++
-	if w.writtenCount < MAX_COMMITTED_PAGES {
-		return nil
+func (w *WalPersister) watchRotateChan(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case file := <-w.rotateChan:
+			if w.currentLog.filename == file {
+				continue
+			}
+			err := w.RotateFile()
+			if err != nil {
+				log.Panic().Err(err).Msg("WAL rotation failed!")
+			}
+		}
 	}
-	return w.RotateFile()
+}
+
+func (w *WalPersister) addWrittenCount() {
+	w.writtenCount++
+	if w.writtenCount >= MAX_COMMITTED_PAGES {
+		w.rotateChan <- w.currentLog.filename
+	}
 }
 
 func (w *WalPersister) RotateFile() error {
-	fd, err := w.FileResolver.NewFile(w.Counter.Now())
+	w.currentLogLock.Lock()
+	defer w.currentLogLock.Unlock()
+	w.changeLogLock.Lock()
+	defer w.changeLogLock.Unlock()
+
+	fd, filename, err := w.FileResolver.NewFile(w.Counter.Now())
 	if err != nil {
 		return err
 	}
-	w.currentFile.Close()
+	w.currentLog.Close()
 
-	w.currentFile = NewWalWriteFile(fd)
+	w.currentLog = NewWalWriteFile(fd, filename)
 	w.writtenCount = 0
+
+	select {
+	case *w.flushChan <- true:
+		break
+	default:
+		break
+	}
 	return nil
 }
 
 type walPersisterBuilder struct {
-	writer    WalWriter
 	persister *WalPersister
+	closed    bool
 }
 
-func (w *walPersisterBuilder) Insert(set page.CandleSet, candles []common.TimestampCandle) error {
-	w.persister.lock.Lock()
-	defer w.persister.lock.Unlock()
-	return w.writer.Insert(set, candles)
+func (w *walPersisterBuilder) Write(e command.Command) error {
+	return w.persister.currentLog.Write(e)
 }
 
-func (w *walPersisterBuilder) Commit() error {
-	w.persister.lock.Lock()
-	defer w.persister.lock.Unlock()
-	if err := w.writer.Commit(); err != nil {
-		return err
+func (w *walPersisterBuilder) Close() error {
+	if w.closed {
+		return errors.New("cannot to close twice")
 	}
-	if err := w.persister.addWrittenCount(); err != nil {
-		return err
-	}
-	go func() {
-		w.persister.flushChan <- true
-	}()
+	w.closed = true
+	w.persister.currentLogLock.RUnlock()
+	w.persister.addWrittenCount()
 	return nil
 }

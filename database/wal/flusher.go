@@ -4,9 +4,9 @@ import (
 	"io"
 	"os"
 
+	"github.com/jungnoh/mora/database/command"
 	"github.com/jungnoh/mora/database/disk"
 	"github.com/jungnoh/mora/database/util"
-	"github.com/jungnoh/mora/database/wal/entry"
 	"github.com/jungnoh/mora/page"
 	"github.com/pkg/errors"
 )
@@ -14,10 +14,10 @@ import (
 type flusherTransaction struct {
 	TxId      uint64
 	Committed bool
-	Entries   []entry.WalEntry
+	Entries   []command.Command
 }
 
-func (f *flusherTransaction) AddEntry(e entry.WalEntry) {
+func (f *flusherTransaction) AddEntry(e command.Command) {
 	f.Entries = append(f.Entries, e)
 }
 
@@ -79,7 +79,7 @@ func (w *WalFlusher) processFromDisk(file string) error {
 				TxId: e.TxID,
 			}
 		}
-		if e.Type == entry.ENTRYID_COMMIT {
+		if e.Type == command.CommitCommandType {
 			readResult[e.TxID].Committed = true
 			if err := w.flushToMemory(readResult[e.TxID]); err != nil {
 				return err

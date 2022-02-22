@@ -31,18 +31,23 @@ func (w WalFileResolver) AllFiles() ([]string, error) {
 	result := make([]string, 0, len(files))
 	for _, file := range files {
 		if !file.IsDir() && w.filenameIsWalLog(file.Name()) {
-			result = append(result, path.Join(directory, file.Name()))
+			result = append(result, file.Name())
 		}
 	}
 	return result, nil
 }
 
-func (w WalFileResolver) NewFile(txid uint64) (*os.File, error) {
+func (w WalFileResolver) NewFile(txid uint64) (*os.File, string, error) {
 	filename, err := w.ensureNewFile(txid)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return os.Create(path.Join(w.dir(), filename))
+	fd, err := os.Create(path.Join(w.dir(), filename))
+	return fd, filename, err
+}
+
+func (w WalFileResolver) FullPath(filename string) string {
+	return path.Join(w.Config.Directory, "wal", filename)
 }
 
 func (w WalFileResolver) dir() string {

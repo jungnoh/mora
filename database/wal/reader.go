@@ -4,17 +4,17 @@ import (
 	"io"
 	"os"
 
-	"github.com/jungnoh/mora/database/wal/entry"
+	"github.com/jungnoh/mora/database/command"
 )
 
 type WalEntryMap map[uint64]*WalReadResult
 
 type WalReadResult struct {
-	Entries   []entry.WalEntry
+	Entries   []command.Command
 	Committed bool
 }
 
-func (w *WalReadResult) AddEntry(e entry.WalEntry) {
+func (w *WalReadResult) AddEntry(e command.Command) {
 	w.Entries = append(w.Entries, e)
 }
 
@@ -31,7 +31,7 @@ func (w WalLogReader) ReadAll(result *WalEntryMap) error {
 		return err
 	}
 	for {
-		newEntry := entry.WalEntry{}
+		newEntry := command.Command{}
 		err := newEntry.Read(0, w.fd)
 		if err == io.EOF {
 			break
@@ -41,11 +41,11 @@ func (w WalLogReader) ReadAll(result *WalEntryMap) error {
 		}
 		if _, ok := (*result)[newEntry.TxID]; !ok {
 			(*result)[newEntry.TxID] = &WalReadResult{
-				Entries: make([]entry.WalEntry, 0),
+				Entries: make([]command.Command, 0),
 			}
 		}
 		(*result)[newEntry.TxID].AddEntry(newEntry)
-		if _, ok := newEntry.Content.(*entry.WalCommitContent); ok {
+		if newEntry.Type == command.CommitCommandType {
 			(*result)[newEntry.TxID].SetAsCommitted()
 		}
 	}
@@ -58,8 +58,8 @@ func (w WalLogReader) ListCommittedAll() (map[uint64]bool, error) {
 	}
 	result := make(map[uint64]bool)
 	for {
-		newEntry := entry.WalEntry{}
-		err := newEntry.ReadOnlyHeader(0, w.fd)
+		newEntry := command.Command{}
+		err := newEntry.ReadHeader(0, w.fd)
 		if err == io.EOF {
 			break
 		}
@@ -69,7 +69,7 @@ func (w WalLogReader) ListCommittedAll() (map[uint64]bool, error) {
 		if _, ok := result[newEntry.TxID]; !ok {
 			result[newEntry.TxID] = false
 		}
-		result[newEntry.TxID] = result[newEntry.TxID] || (newEntry.Type == entry.ENTRYID_COMMIT)
+		result[newEntry.TxID] = result[newEntry.TxID] || (newEntry.Type == command.CommitCommandType)
 	}
 	return result, nil
 }
@@ -79,7 +79,7 @@ func (w WalLogReader) SeekToStart() error {
 	return err
 }
 
-func (w WalLogReader) Read() (e entry.WalEntry, err error) {
+func (w WalLogReader) Read() (e command.Command, err error) {
 	err = e.Read(0, w.fd)
 	return
 }

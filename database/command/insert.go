@@ -1,4 +1,4 @@
-package entry
+package command
 
 import (
 	"encoding/binary"
@@ -9,9 +9,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-const walInsertEntryHeadSize uint32 = 38
+const insertCommandHeadSize uint32 = 38
 
-type WalInsertContent struct {
+type InsertCommand struct {
 	Year         uint16
 	CandleLength uint32
 	MarketCode   string
@@ -20,8 +20,8 @@ type WalInsertContent struct {
 	Candles      []common.TimestampCandle
 }
 
-func NewWalInsertContent(set page.CandleSet, candles []common.TimestampCandle) WalInsertContent {
-	return WalInsertContent{
+func NewInsertCommand(set page.CandleSet, candles []common.TimestampCandle) InsertCommand {
+	return InsertCommand{
 		Year:         set.Year,
 		CandleLength: set.CandleLength,
 		MarketCode:   set.MarketCode,
@@ -31,20 +31,20 @@ func NewWalInsertContent(set page.CandleSet, candles []common.TimestampCandle) W
 	}
 }
 
-func (e *WalInsertContent) Read(size uint32, r io.Reader) error {
-	if size < walInsertEntryHeadSize || (size-walInsertEntryHeadSize)%48 != 0 {
+func (e *InsertCommand) Read(size uint32, r io.Reader) error {
+	if size < insertCommandHeadSize || (size-insertCommandHeadSize)%48 != 0 {
 		return errors.New("wrong data size")
 	}
-	headerBin := make([]byte, walInsertEntryHeadSize)
+	headerBin := make([]byte, insertCommandHeadSize)
 	n, err := r.Read(headerBin)
-	if uint32(n) < walInsertEntryHeadSize {
+	if uint32(n) < insertCommandHeadSize {
 		return io.EOF
 	}
 	if err != nil {
 		return err
 	}
 
-	blockCount := (size - walInsertEntryHeadSize) / 48
+	blockCount := (size - insertCommandHeadSize) / 48
 	e.Year = binary.LittleEndian.Uint16(headerBin[0:2])
 	e.CandleLength = binary.LittleEndian.Uint32(headerBin[2:6])
 	e.MarketCode = string(headerBin[6:16])
@@ -59,7 +59,7 @@ func (e *WalInsertContent) Read(size uint32, r io.Reader) error {
 	return nil
 }
 
-func (e *WalInsertContent) Write(w io.Writer) (err error) {
+func (e *InsertCommand) Write(w io.Writer) (err error) {
 	if err = binary.Write(w, binary.LittleEndian, e.Year); err != nil {
 		return
 	}
@@ -84,25 +84,25 @@ func (e *WalInsertContent) Write(w io.Writer) (err error) {
 	return nil
 }
 
-func (e *WalInsertContent) BinarySize() uint32 {
-	return walInsertEntryHeadSize + uint32(48*len(e.Candles))
+func (e *InsertCommand) BinarySize() uint32 {
+	return insertCommandHeadSize + uint32(48*len(e.Candles))
 }
 
-func (e *WalInsertContent) TypeId() EntryType {
-	return ENTRYID_INSERT
+func (e *InsertCommand) TypeId() CommandType {
+	return InsertCommandType
 }
 
-func (e *WalInsertContent) TargetSets() []page.CandleSet {
+func (e *InsertCommand) TargetSets() []page.CandleSet {
 	return []page.CandleSet{
 		e.targetSet(),
 	}
 }
 
-func (e *WalInsertContent) Persist(pages *map[string]*page.Page) error {
+func (e *InsertCommand) Persist(pages *map[string]*page.Page) error {
 	return (*pages)[e.targetSet().UniqueKey()].Add(common.TimestampCandleList(e.Candles).ToCandleList())
 }
 
-func (e *WalInsertContent) targetSet() page.CandleSet {
+func (e *InsertCommand) targetSet() page.CandleSet {
 	return page.CandleSet{
 		Year: e.Year,
 		CandleSetWithoutYear: page.CandleSetWithoutYear{

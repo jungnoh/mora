@@ -27,6 +27,7 @@ func NewDatabase(config util.Config) *Database {
 	db.Mem.Config = &db.config
 	db.Disk.Lock = &db.lock
 	db.Disk.Config = &db.config
+	// TODO: init wal
 	return &db
 }
 
