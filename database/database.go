@@ -20,15 +20,20 @@ type Database struct {
 	Wal    wal.WriteAheadLog
 }
 
-func NewDatabase(config util.Config) *Database {
+func NewDatabase(config util.Config) (*Database, error) {
 	db := Database{}
 	db.config = config
 	db.Mem.Lock = &db.lock
 	db.Mem.Config = &db.config
 	db.Disk.Lock = &db.lock
 	db.Disk.Config = &db.config
-	// TODO: init wal
-	return &db
+
+	walInstance, err := wal.NewWriteAheadLog(&db.config, &db.lock, &db.Disk)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to initialize WAL")
+	}
+	db.Wal = walInstance
+	return &db, nil
 }
 
 func (d *Database) loadPage(set page.CandleSet, lock bool) (page.Page, error) {
