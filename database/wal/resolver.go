@@ -54,10 +54,11 @@ func (w WalFileResolver) dir() string {
 	return path.Join(w.Config.Directory, "wal")
 }
 
-func (w WalFileResolver) ensureNewFile(txid uint64) (string, error) {
+func (w WalFileResolver) ensureNewFile(txId uint64) (string, error) {
 	now := time.Now().UnixMilli()
+	usedId := txId
 	for {
-		filename := w.makeFilename(now, txid)
+		filename := w.makeFilename(now, usedId)
 		exists, err := util.FileExists(path.Join(w.dir(), filename))
 		if err != nil {
 			return "", err
@@ -65,12 +66,12 @@ func (w WalFileResolver) ensureNewFile(txid uint64) (string, error) {
 		if !exists {
 			return filename, nil
 		}
-		now++
+		usedId++
 	}
 }
 
-func (w WalFileResolver) makeFilename(now int64, txid uint64) string {
-	return fmt.Sprintf("%s%d%05d%s", walFilePrefix, now, txid%100000, walFileSuffix)
+func (w WalFileResolver) makeFilename(now int64, id uint64) string {
+	return fmt.Sprintf("%s%d%05d%s", walFilePrefix, now, id%100000, walFileSuffix)
 }
 
 func (w WalFileResolver) filenameIsWalLog(name string) bool {
