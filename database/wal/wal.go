@@ -59,17 +59,17 @@ func (w *WriteAheadLog) Flush() {
 	w.flushChan <- true
 }
 
-func (w *WriteAheadLog) Begin() (uint64, walPersisterBuilder, error) {
+func (w *WriteAheadLog) Begin() (uint64, PersistRunner, error) {
 	w.lock.WAL.Lock()
 	defer w.lock.WAL.Unlock()
 
 	txId, err := w.counter.Next()
 	if err != nil {
-		return 0, walPersisterBuilder{}, err
+		return 0, PersistRunner{}, err
 	}
 	builder, err := w.persister.StartBuilder()
 	if err != nil {
-		return 0, walPersisterBuilder{}, errors.Wrapf(err, "failed to create tx builder (tx=%d)", txId)
+		return 0, PersistRunner{}, errors.Wrapf(err, "failed to create tx builder (tx=%d)", txId)
 	}
 	return txId, builder, err
 }

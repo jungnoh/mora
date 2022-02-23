@@ -2,6 +2,7 @@ package command
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 
 	"github.com/jungnoh/mora/common"
@@ -20,7 +21,7 @@ type InsertCommand struct {
 	Candles      []common.TimestampCandle
 }
 
-func NewInsertCommand(set page.CandleSet, candles []common.TimestampCandle) InsertCommand {
+func NewInsertCommand(set page.CandleSet, candles common.TimestampCandleList) InsertCommand {
 	return InsertCommand{
 		Year:         set.Year,
 		CandleLength: set.CandleLength,
@@ -85,6 +86,7 @@ func (e *InsertCommand) Write(w io.Writer) (err error) {
 }
 
 func (e *InsertCommand) BinarySize() uint32 {
+	fmt.Println(len(e.Candles))
 	return insertCommandHeadSize + uint32(48*len(e.Candles))
 }
 
@@ -111,4 +113,8 @@ func (e *InsertCommand) targetSet() page.CandleSet {
 			Code:         e.Code,
 		},
 	}
+}
+
+func (e *InsertCommand) String() string {
+	return fmt.Sprintf("INSERT(%s,%s,%d,%d)", e.MarketCode, e.Code, e.CandleLength, e.Year)
 }

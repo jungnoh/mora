@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/jungnoh/mora/common"
+	"github.com/jungnoh/mora/database/command"
 	"github.com/jungnoh/mora/database/disk"
 	"github.com/jungnoh/mora/database/memory"
 	"github.com/jungnoh/mora/database/util"
@@ -97,29 +98,34 @@ func (d *Database) writePage(set page.CandleSet, candles []common.Candle) error 
 	return nil
 }
 
-func (d *Database) Write(set page.CandleSetWithoutYear, candles common.CandleList) error {
-	years := candles.SplitByYear()
-	wg := sync.WaitGroup{}
-	wg.Add(len(years))
-
-	errList := make([]error, 0)
-	for key := range years {
-		year := key
-		go func() {
-			err := d.writePage(page.CandleSet{
-				CandleSetWithoutYear: set,
-				Year:                 year,
-			}, years[year])
-			if err != nil {
-				errList = append(errList, err)
-			}
-			wg.Done()
-		}()
-	}
-	wg.Wait()
-
-	if len(errList) > 0 {
-		return errList[0]
+func (d *Database) executeCommand(cmd command.CommandContent, txId uint64, factory wal.PersistRunner) error {
+	fullCmd := command.NewCommand(txId, cmd)
+	// TODO: Write to mem
+	if err := factory.Write(fullCmd); err != nil {
+		return err
 	}
 	return nil
+}
+
+func (d *Database) Execute(commands []command.CommandContent) error {
+	txId, factory, err := d.Wal.Begin()
+	if err != nil {
+		return errors.Wrap(err, "exec: wal tx start failed")
+	}
+	defer factory.Close()
+	for _, cmd := range commands {
+		if err := d.executeCommand(cmd, txId, factory); err != nil {
+			return errors.Wrapf(err, "exec cmd failed: %s", cmd.String())
+		}
+	}
+	if err := factory.Write(command.NewCommand(txId, &command.CommitCommand{})); err != nil {
+		return errors.Wrap(err, "failed to log commit")
+	}
+	return factory.Close()
+}
+
+// High level commands
+func (d *Database) Write(set page.CandleSetWithoutYear, candles common.CandleList) error {
+	commands := CommandContentFactory{}.InsertToSet(set, candles)
+	return d.Execute(commands)
 }

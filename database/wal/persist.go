@@ -23,7 +23,7 @@ type WalPersister struct {
 	changeLogLock  sync.Mutex
 	writtenCount   int
 	rotateChan     chan string
-	flushChan      *chan<- bool
+	flushChan      chan bool
 	ctxCancel      context.CancelFunc
 }
 
@@ -33,6 +33,7 @@ func (w *WalPersister) Setup() error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	w.ctxCancel = cancel
+	w.flushChan = make(chan bool)
 	go w.watchRotateChan(ctx)
 	return nil
 }
@@ -42,13 +43,13 @@ func (w *WalPersister) Close() {
 	defer w.currentLogLock.Unlock()
 
 	w.currentLog.Close()
-	close(*w.flushChan)
+	close(w.flushChan)
 	w.ctxCancel()
 }
 
-func (w *WalPersister) StartBuilder() (walPersisterBuilder, error) {
+func (w *WalPersister) StartBuilder() (PersistRunner, error) {
 	w.currentLogLock.RLock()
-	return walPersisterBuilder{
+	return PersistRunner{
 		persister: w,
 	}, nil
 }
@@ -93,7 +94,7 @@ func (w *WalPersister) RotateFile() error {
 	w.writtenCount = 0
 
 	select {
-	case *w.flushChan <- true:
+	case w.flushChan <- true:
 		break
 	default:
 		break
@@ -101,18 +102,18 @@ func (w *WalPersister) RotateFile() error {
 	return nil
 }
 
-type walPersisterBuilder struct {
+type PersistRunner struct {
 	persister *WalPersister
 	closed    bool
 }
 
-func (w *walPersisterBuilder) Write(e command.Command) error {
+func (w *PersistRunner) Write(e command.Command) error {
 	return w.persister.currentLog.Write(e)
 }
 
-func (w *walPersisterBuilder) Close() error {
+func (w *PersistRunner) Close() error {
 	if w.closed {
-		return errors.New("cannot to close twice")
+		return nil
 	}
 	w.closed = true
 	w.persister.currentLogLock.RUnlock()

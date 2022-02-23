@@ -8,7 +8,15 @@ type CandleList []Candle
 
 type TimestampCandleList []TimestampCandle
 
-func (t TimestampCandleList) ToCandleList() []Candle {
+func (t CandleList) ToTimestampCandleList() TimestampCandleList {
+	result := make(TimestampCandleList, 0, len(t))
+	for _, v := range t {
+		result = append(result, v.ToTimestampCandle())
+	}
+	return result
+}
+
+func (t TimestampCandleList) ToCandleList() CandleList {
 	result := make(CandleList, 0, len(t))
 	for _, v := range t {
 		result = append(result, v.ToCandle())
@@ -28,6 +36,13 @@ type TimelessCandle struct {
 type Candle struct {
 	TimelessCandle
 	Timestamp time.Time
+}
+
+func (c Candle) ToTimestampCandle() TimestampCandle {
+	return TimestampCandle{
+		TimelessCandle: c.TimelessCandle,
+		Timestamp:      c.Timestamp.Unix(),
+	}
 }
 
 type TimestampCandle struct {

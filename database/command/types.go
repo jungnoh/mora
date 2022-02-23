@@ -23,4 +23,5 @@ type CommandContent interface {
 	TypeId() CommandType
 	TargetSets() []page.CandleSet
 	Persist(pages *map[string]*page.Page) error
+	String() string
 }

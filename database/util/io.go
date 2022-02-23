@@ -3,6 +3,7 @@ package util
 import (
 	"errors"
 	"os"
+	"path"
 )
 
 func FileExists(path string) (bool, error) {
@@ -13,4 +14,8 @@ func FileExists(path string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func EnsureDirectoryOfFile(filePath string) error {
+	return os.MkdirAll(path.Dir(filePath), 0755)
 }

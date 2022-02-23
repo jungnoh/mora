@@ -32,3 +32,7 @@ func (e *CommitCommand) TargetSets() []page.CandleSet {
 func (e *CommitCommand) Persist(_ *map[string]*page.Page) error {
 	return nil
 }
+
+func (e *CommitCommand) String() string {
+	return "COMMIT"
+}

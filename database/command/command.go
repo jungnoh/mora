@@ -2,6 +2,7 @@ package command
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 
 	"github.com/pkg/errors"
@@ -88,4 +89,8 @@ func (e *Command) BinarySize() uint32 {
 		return 16
 	}
 	return 16 + e.Content.BinarySize()
+}
+
+func (e *Command) String() string {
+	return fmt.Sprintf("Command(%d, %s)", e.TxID, e.Content.String())
 }

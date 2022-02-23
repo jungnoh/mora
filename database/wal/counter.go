@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/jungnoh/mora/database/util"
 	"github.com/pkg/errors"
 )
 
@@ -24,6 +25,9 @@ func (w *WalCounter) Open(file string) error {
 		w.fd = nil
 	}
 
+	if err := util.EnsureDirectoryOfFile(file); err != nil {
+		return err
+	}
 	fd, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		return err
