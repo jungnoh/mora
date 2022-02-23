@@ -1,7 +1,6 @@
 package wal
 
 import (
-	"fmt"
 	"io"
 	"os"
 
@@ -106,6 +105,7 @@ func (w *WalFlusher) processFromDisk(file string) error {
 		}
 		if e.Type == command.CommitCommandType {
 			readResult[e.TxID].Committed = true
+			log.Debug().Uint64("tx", e.TxID).Msg("committing")
 			if err := w.flushToMemory(readResult[e.TxID]); err != nil {
 				return err
 			}
@@ -128,7 +128,6 @@ func (w *WalFlusher) processFromDisk(file string) error {
 
 func (w *WalFlusher) flushToMemory(tx *flusherTransaction) error {
 	neededPages := tx.NeededPages()
-	fmt.Println(neededPages)
 	for _, set := range neededPages {
 		// Acquire lock
 		pageKey := set.UniqueKey()
