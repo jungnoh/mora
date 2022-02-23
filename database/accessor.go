@@ -1,6 +1,8 @@
 package database
 
-import "github.com/jungnoh/mora/page"
+import (
+	"github.com/jungnoh/mora/page"
+)
 
 type pageAccessor struct {
 	db *Database
@@ -13,5 +15,6 @@ func (a *pageAccessor) Acquire(set page.CandleSet) (func(), error) {
 }
 
 func (a *pageAccessor) Get(set page.CandleSet) (*page.Page, error) {
-	return a.db.loadPage(set, false)
+	pg, err := a.db.loadPage(set, false)
+	return pg, err
 }

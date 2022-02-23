@@ -31,9 +31,9 @@ func (t *TimestampCandle) Write(w io.Writer) error {
 }
 
 func (t *TimestampCandle) Read(_ uint32, r io.Reader) error {
-	bin := make([]byte, 48)
+	bin := make([]byte, 52)
 	n, err := r.Read(bin)
-	if uint32(n) < 48 {
+	if n < 52 || len(bin) < 52 {
 		return io.EOF
 	}
 	if err != nil {
@@ -42,11 +42,11 @@ func (t *TimestampCandle) Read(_ uint32, r io.Reader) error {
 	t.Timestamp = int64(binary.LittleEndian.Uint32(bin[0:8]))
 	t.TimelessCandle = TimelessCandle{
 		BitFields: binary.BigEndian.Uint32(bin[8:12]),
-		Open:      Float64frombytes(bin[12:16]),
-		High:      Float64frombytes(bin[16:24]),
-		Low:       Float64frombytes(bin[24:32]),
-		Close:     Float64frombytes(bin[32:40]),
-		Volume:    Float64frombytes(bin[40:48]),
+		Open:      Float64frombytes(bin[12:20]),
+		High:      Float64frombytes(bin[20:28]),
+		Low:       Float64frombytes(bin[28:36]),
+		Close:     Float64frombytes(bin[36:44]),
+		Volume:    Float64frombytes(bin[44:52]),
 	}
 	return nil
 }

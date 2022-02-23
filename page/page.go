@@ -14,6 +14,23 @@ type Page struct {
 	Body   PageBodyBlockList
 }
 
+func NewPage(set CandleSet) Page {
+	return Page{
+		Header: PageHeader{
+			MarketCode:   set.MarketCode,
+			Code:         set.Code,
+			CandleLength: set.CandleLength,
+			Year:         set.Year,
+			Index:        make(PageIndex, INDEX_COUNT),
+		},
+		Body: make(PageBodyBlockList, 0),
+	}
+}
+
+func (p Page) IsZero() bool {
+	return p.Header.Year == 0
+}
+
 func (p *Page) Read(_ uint32, r io.Reader) error {
 	if err := p.Header.Read(0, r); err != nil {
 		return errors.Wrap(err, "failed to read page header")
@@ -33,8 +50,11 @@ func (p *Page) Read(_ uint32, r io.Reader) error {
 }
 
 func (p *Page) Add(candles common.CandleList) error {
+	if len(candles) == 0 {
+		return nil
+	}
 	sort.Sort(candles)
-
+	fmt.Printf("%p %+v\n", &p, p)
 	firstInRange := p.Header.TimestampInPageRange(candles[0].Timestamp.Unix())
 	lastInRange := p.Header.TimestampInPageRange(candles[len(candles)-1].Timestamp.Unix())
 	if !(firstInRange && lastInRange) {

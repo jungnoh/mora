@@ -103,7 +103,7 @@ func (m *Memory) Insert(page page.Page) error {
 	defer m.Lock.MemoryLL.Unlock()
 
 	m.Lock.MemoryMap.Lock()
-	defer m.Lock.MemoryMap.Lock()
+	defer m.Lock.MemoryMap.Unlock()
 	m.Map[pageKey] = &MemoryPage{
 		Key:             pageKey,
 		Content:         page,

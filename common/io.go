@@ -2,8 +2,10 @@ package common
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"math"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -19,6 +21,9 @@ type SizableBinaryReadWriter interface {
 }
 
 func Float64frombytes(bytes []byte) float64 {
+	if len(bytes) < 8 {
+		fmt.Println(bytes)
+	}
 	bits := binary.LittleEndian.Uint64(bytes)
 	float := math.Float64frombits(bits)
 	return float
@@ -36,4 +41,8 @@ func WriteNullPaddedString(length int, str string, w io.Writer) error {
 		return err
 	}
 	return nil
+}
+
+func ReadNullPaddedString(data []byte) string {
+	return strings.TrimRight(string(data), "\u0000")
 }

@@ -1,8 +1,11 @@
 package wal
 
 import (
+	"fmt"
 	"io"
 	"os"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/jungnoh/mora/database/command"
 	"github.com/jungnoh/mora/database/disk"
@@ -41,9 +44,7 @@ type flusherAccessor struct {
 }
 
 func (a *flusherAccessor) Acquire(set page.CandleSet) (func(), error) {
-	lock := a.f.loadedPagesLock.Get(set.UniqueKey())
-	lock.Lock()
-	return lock.Unlock, nil
+	return func() {}, nil
 }
 
 func (a *flusherAccessor) Get(set page.CandleSet) (*page.Page, error) {
@@ -58,10 +59,20 @@ type WalFlusher struct {
 	loadedPages     map[string]*page.Page
 }
 
+func NewWalFlusher(resolver *WalFileResolver, disk *disk.Disk) WalFlusher {
+	return WalFlusher{
+		FileResolver:    resolver,
+		Disk:            disk,
+		loadedPagesLock: util.NewMutexMap(),
+		loadedPages:     make(map[string]*page.Page),
+	}
+}
+
 func (w *WalFlusher) FlushWal(files []string) error {
 	for _, file := range files {
+		log.Debug().Str("file", file).Msg("flushing log")
 		w.loadedPages = make(map[string]*page.Page)
-		w.loadedPagesLock = util.MutexMap{}
+		w.loadedPagesLock = util.NewMutexMap()
 		if err := w.processFromDisk(file); err != nil {
 			return errors.Wrapf(err, "failed to process log: %s", file)
 		}
@@ -78,6 +89,7 @@ func (w *WalFlusher) FlushWal(files []string) error {
 }
 func (w *WalFlusher) processFromDisk(file string) error {
 	readResult := make(map[uint64]*flusherTransaction)
+	fmt.Println("opened")
 	fd, err := os.Open(file)
 	if err != nil {
 		return errors.Wrap(err, "failed to open file")
@@ -117,6 +129,7 @@ func (w *WalFlusher) processFromDisk(file string) error {
 
 func (w *WalFlusher) flushToMemory(tx *flusherTransaction) error {
 	neededPages := tx.NeededPages()
+	fmt.Println(neededPages)
 	for _, set := range neededPages {
 		// Acquire lock
 		pageKey := set.UniqueKey()
@@ -129,6 +142,9 @@ func (w *WalFlusher) flushToMemory(tx *flusherTransaction) error {
 			loadedPage, err := w.Disk.Read(set)
 			if err != nil {
 				return errors.Wrapf(err, "failed to load page with key '%s' (tx=%d)", pageKey, tx.TxId)
+			}
+			if loadedPage.IsZero() {
+				loadedPage = page.NewPage(set)
 			}
 			w.loadedPages[pageKey] = &loadedPage
 		}

@@ -1,9 +1,12 @@
 package wal
 
 import (
+	"fmt"
+
 	"github.com/jungnoh/mora/database/disk"
 	"github.com/jungnoh/mora/database/util"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 type WriteAheadLog struct {
@@ -33,10 +36,7 @@ func NewWriteAheadLog(config *util.Config, lock *util.LockSet, disk *disk.Disk) 
 		return WriteAheadLog{}, err
 	}
 
-	flusher := WalFlusher{
-		Disk:         disk,
-		FileResolver: &resolver,
-	}
+	flusher := NewWalFlusher(&resolver, disk)
 
 	wal := WriteAheadLog{
 		config:    config,
@@ -46,6 +46,7 @@ func NewWriteAheadLog(config *util.Config, lock *util.LockSet, disk *disk.Disk) 
 		persister: &persister,
 		flusher:   &flusher,
 		resolver:  resolver,
+		flushChan: make(chan bool),
 	}
 	go wal.listenToFlush()
 	return wal, nil
@@ -76,8 +77,14 @@ func (w *WriteAheadLog) Begin() (uint64, PersistRunner, error) {
 
 func (w *WriteAheadLog) listenToFlush() {
 	// channel should close when WriteAheadLog is closed; no context is needed
+	fmt.Println("bye")
 	for range w.flushChan {
-		w.execFlush()
+		err := w.execFlush()
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to flush write ahead log")
+		} else {
+			log.Debug().Msg("flushing write ahead log complete")
+		}
 	}
 }
 

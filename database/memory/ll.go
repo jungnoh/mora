@@ -1,13 +1,12 @@
 package memory
 
-import "github.com/pkg/errors"
+import (
+	"github.com/pkg/errors"
+)
 
 func (m *Memory) SetAsClean(page *MemoryPage) {
-	pageLock := m.Lock.Memory.Get(page.Key)
 	m.Lock.MemoryLL.Lock()
 	defer m.Lock.MemoryLL.Unlock()
-	pageLock.Lock()
-	defer pageLock.Unlock()
 
 	if page.InLL {
 		if page.Dirty {
@@ -20,11 +19,8 @@ func (m *Memory) SetAsClean(page *MemoryPage) {
 }
 
 func (m *Memory) SetAsDirty(page *MemoryPage) {
-	pageLock := m.Lock.Memory.Get(page.Key)
 	m.Lock.MemoryLL.Lock()
 	defer m.Lock.MemoryLL.Unlock()
-	pageLock.Lock()
-	defer pageLock.Unlock()
 
 	if page.InLL {
 		if page.Dirty {
@@ -41,7 +37,7 @@ func (m *Memory) addToDirtyLL(page *MemoryPage) {
 	if page.InLL || !page.Dirty {
 		panic(errors.New("trying to insert page into dirty LL that is in LL or not dirty"))
 	}
-	if m.DirtyStart != nil {
+	if m.DirtyStart != nil && m.DirtyStart.Key != page.Key {
 		prevLock := m.Lock.Memory.Get(m.DirtyStart.Key)
 		prevLock.Lock()
 		defer prevLock.Unlock()
@@ -60,7 +56,7 @@ func (m *Memory) addToCleanLL(page *MemoryPage) {
 	if page.InLL || page.Dirty {
 		panic(errors.New("trying to insert page into clean LL that is in LL or not clean"))
 	}
-	if m.CleanStart != nil {
+	if m.CleanStart != nil && m.CleanStart.Key != page.Key {
 		prevLock := m.Lock.Memory.Get(m.CleanStart.Key)
 		prevLock.Lock()
 		defer prevLock.Unlock()

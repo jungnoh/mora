@@ -2,7 +2,6 @@ package disk
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path"
 
@@ -58,6 +57,9 @@ func (d Disk) Read(set page.CandleSet) (page.Page, error) {
 	path := d.filePathFromSet(set)
 	f, err := os.Open(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return page.Page{}, nil
+		}
 		return page.Page{}, errors.Wrap(err, "disk Read failed")
 	}
 	defer f.Close()
@@ -74,7 +76,10 @@ func (d Disk) Write(content page.Page) error {
 	defer lock.Unlock()
 
 	path := d.filePathFromHeader(content.Header)
-	f, err := os.OpenFile(path, 0755, fs.FileMode(os.O_RDWR|os.O_TRUNC|os.O_CREATE))
+	if err := util.EnsureDirectoryOfFile(path); err != nil {
+		return errors.Wrap(err, "disk file folder preparing failed")
+	}
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0755)
 	if err != nil {
 		return errors.Wrap(err, "disk file open failed")
 	}

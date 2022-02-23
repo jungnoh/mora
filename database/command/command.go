@@ -33,7 +33,7 @@ func (e *Command) Read(_ uint32, r io.Reader) error {
 	case CommitCommandType:
 		e.Content = &CommitCommand{}
 	case InsertCommandType:
-		e.Content = &CommitCommand{}
+		e.Content = &InsertCommand{}
 	default:
 		return errors.Errorf("unknown entry type %d", e.Type)
 	}

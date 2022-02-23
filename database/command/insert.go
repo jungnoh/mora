@@ -45,14 +45,13 @@ func (e *InsertCommand) Read(size uint32, r io.Reader) error {
 		return err
 	}
 
-	blockCount := (size - insertCommandHeadSize) / 48
 	e.Year = binary.LittleEndian.Uint16(headerBin[0:2])
 	e.CandleLength = binary.LittleEndian.Uint32(headerBin[2:6])
-	e.MarketCode = string(headerBin[6:16])
-	e.Code = string(headerBin[16:34])
+	e.MarketCode = common.ReadNullPaddedString(headerBin[6:16])
+	e.Code = common.ReadNullPaddedString(headerBin[16:34])
 	e.Count = binary.LittleEndian.Uint32(headerBin[34:38])
-	e.Candles = make([]common.TimestampCandle, blockCount)
-	for i := uint32(0); i < blockCount; i++ {
+	e.Candles = make([]common.TimestampCandle, e.Count)
+	for i := uint32(0); i < e.Count; i++ {
 		if err := e.Candles[i].Read(48, r); err != nil {
 			return err
 		}
@@ -86,7 +85,6 @@ func (e *InsertCommand) Write(w io.Writer) (err error) {
 }
 
 func (e *InsertCommand) BinarySize() uint32 {
-	fmt.Println(len(e.Candles))
 	return insertCommandHeadSize + uint32(48*len(e.Candles))
 }
 

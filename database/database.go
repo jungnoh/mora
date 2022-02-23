@@ -29,6 +29,7 @@ func NewDatabase(config util.Config) (*Database, error) {
 		Memory: util.NewRWMutexMap(),
 	}
 	db.config = config
+	db.Mem.Map = make(map[string]*memory.MemoryPage)
 	db.Mem.Lock = &db.lock
 	db.Mem.Config = &db.config
 	db.Disk.Lock = &db.lock
@@ -67,6 +68,9 @@ func (d *Database) loadPage(set page.CandleSet, lock bool) (*page.Page, error) {
 	loadedPage, err := d.Disk.Read(set)
 	if err != nil {
 		return &page.Page{}, errors.Wrap(err, "loadBlock disk read failed")
+	}
+	if loadedPage.IsZero() {
+		loadedPage = page.NewPage(set)
 	}
 	if err := d.Mem.Insert(loadedPage); err != nil {
 		return &page.Page{}, errors.Wrap(err, "loadBlock memory insert failed")

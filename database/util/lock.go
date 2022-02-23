@@ -1,10 +1,19 @@
 package util
 
-import "sync"
+import (
+	"sync"
+)
 
 type MutexMap struct {
 	access sync.Mutex
 	locks  map[string]*sync.Mutex
+}
+
+func NewMutexMap() MutexMap {
+	return MutexMap{
+		access: sync.Mutex{},
+		locks:  make(map[string]*sync.Mutex),
+	}
 }
 
 func (m *MutexMap) Get(key string) *sync.Mutex {
