@@ -70,7 +70,7 @@ func (c CandleList) Less(i, j int) bool {
 func (c CandleList) SplitByYear() map[uint16]CandleList {
 	years := make(map[uint16]CandleList)
 	for i := range c {
-		year := uint16(c[i].Timestamp.Year())
+		year := uint16(c[i].Timestamp.UTC().Year())
 		if _, ok := years[year]; !ok {
 			years[year] = make(CandleList, 0)
 		}

@@ -67,15 +67,19 @@ func (d *Database) loadPage(set page.CandleSet, lock bool) (*page.Page, error) {
 	}
 	loadedPage, err := d.Disk.Read(set)
 	if err != nil {
-		return &page.Page{}, errors.Wrap(err, "loadBlock disk read failed")
+		return &page.Page{}, errors.Wrapf(err, "loadBlock disk read failed (key %s)", key)
 	}
 	if loadedPage.IsZero() {
 		loadedPage = page.NewPage(set)
 	}
 	if err := d.Mem.Insert(loadedPage); err != nil {
-		return &page.Page{}, errors.Wrap(err, "loadBlock memory insert failed")
+		return &page.Page{}, errors.Wrapf(err, "loadBlock memory insert failed (key %s)", key)
 	}
-	return d.Mem.Access(key), nil
+	finalPtr := d.Mem.Access(key)
+	if finalPtr == nil {
+		panic(errors.Errorf("loadBlock has inserted memory but is still null (key %s)", key))
+	}
+	return finalPtr, nil
 }
 
 func (d *Database) executeCommand(cmd command.CommandContent, txId uint64, factory wal.PersistRunner) error {

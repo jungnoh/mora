@@ -89,7 +89,6 @@ func (w *WalFlusher) FlushWal(files []string) error {
 }
 func (w *WalFlusher) processFromDisk(file string) error {
 	readResult := make(map[uint64]*flusherTransaction)
-	fmt.Println("opened")
 	fd, err := os.Open(file)
 	if err != nil {
 		return errors.Wrap(err, "failed to open file")

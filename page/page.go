@@ -54,9 +54,9 @@ func (p *Page) Add(candles common.CandleList) error {
 		return nil
 	}
 	sort.Sort(candles)
-	fmt.Printf("%p %+v\n", &p, p)
 	firstInRange := p.Header.TimestampInPageRange(candles[0].Timestamp.Unix())
 	lastInRange := p.Header.TimestampInPageRange(candles[len(candles)-1].Timestamp.Unix())
+
 	if !(firstInRange && lastInRange) {
 		return errors.New("candle timestamp is not in range")
 	}

@@ -40,8 +40,8 @@ func (p *PageHeader) Read(size uint32, r io.Reader) error {
 	p.StartOffset = binary.LittleEndian.Uint32(headerBin[16:20])
 	p.EndOffset = binary.LittleEndian.Uint32(headerBin[20:24])
 	p.LastTxId = binary.LittleEndian.Uint64(headerBin[24:32])
-	p.MarketCode = string(headerBin[32:42])
-	p.Code = string(headerBin[42:60])
+	p.MarketCode = common.ReadNullPaddedString(headerBin[32:42])
+	p.Code = common.ReadNullPaddedString(headerBin[42:60])
 	p.Index = make([]uint32, INDEX_COUNT)
 
 	indexBin := make([]byte, INDEX_ROW_COUNT*BLOCK_WIDTH)

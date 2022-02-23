@@ -2,7 +2,6 @@ package common
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"math"
 	"strings"
@@ -21,9 +20,6 @@ type SizableBinaryReadWriter interface {
 }
 
 func Float64frombytes(bytes []byte) float64 {
-	if len(bytes) < 8 {
-		fmt.Println(bytes)
-	}
 	bits := binary.LittleEndian.Uint64(bytes)
 	float := math.Float64frombits(bits)
 	return float

@@ -1,8 +1,6 @@
 package wal
 
 import (
-	"fmt"
-
 	"github.com/jungnoh/mora/database/disk"
 	"github.com/jungnoh/mora/database/util"
 	"github.com/pkg/errors"
@@ -77,7 +75,6 @@ func (w *WriteAheadLog) Begin() (uint64, PersistRunner, error) {
 
 func (w *WriteAheadLog) listenToFlush() {
 	// channel should close when WriteAheadLog is closed; no context is needed
-	fmt.Println("bye")
 	for range w.flushChan {
 		err := w.execFlush()
 		if err != nil {
