@@ -36,6 +36,20 @@ func (f *flusherTransaction) NeededPages() []page.CandleSet {
 	return v
 }
 
+type flusherAccessor struct {
+	f *WalFlusher
+}
+
+func (a *flusherAccessor) Acquire(set page.CandleSet) (func(), error) {
+	lock := a.f.loadedPagesLock.Get(set.UniqueKey())
+	lock.Lock()
+	return lock.Unlock, nil
+}
+
+func (a *flusherAccessor) Get(set page.CandleSet) (*page.Page, error) {
+	return a.f.loadedPages[set.UniqueKey()], nil
+}
+
 type WalFlusher struct {
 	FileResolver *WalFileResolver
 	Disk         *disk.Disk
@@ -126,7 +140,7 @@ func (w *WalFlusher) flushToMemory(tx *flusherTransaction) error {
 	}
 
 	for _, e := range tx.Entries {
-		if err := e.Content.Persist(&w.loadedPages); err != nil {
+		if err := e.Content.Persist(&flusherAccessor{f: w}); err != nil {
 			return errors.Wrapf(err, "failed to persist (tx=%d)", tx.TxId)
 		}
 	}

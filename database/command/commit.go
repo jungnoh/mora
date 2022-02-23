@@ -29,7 +29,7 @@ func (e *CommitCommand) TargetSets() []page.CandleSet {
 	return []page.CandleSet{}
 }
 
-func (e *CommitCommand) Persist(_ *map[string]*page.Page) error {
+func (e *CommitCommand) Persist(_ PageSetAccessor) error {
 	return nil
 }
 

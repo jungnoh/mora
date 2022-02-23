@@ -100,8 +100,23 @@ func (e *InsertCommand) TargetSets() []page.CandleSet {
 	}
 }
 
-func (e *InsertCommand) Persist(pages *map[string]*page.Page) error {
-	return (*pages)[e.targetSet().UniqueKey()].Add(common.TimestampCandleList(e.Candles).ToCandleList())
+func (e *InsertCommand) Persist(accessor PageSetAccessor) error {
+	pageKey := e.targetSet().UniqueKey()
+	unlock, err := accessor.Acquire(e.targetSet())
+	if err != nil {
+		return errors.Wrapf(err, "InsertCommand: acquire failed (key '%s')", pageKey)
+	}
+	defer unlock()
+
+	page, err := accessor.Get(e.targetSet())
+	if err != nil {
+		return errors.Wrapf(err, "InsertCommand: page load failed (key '%s')", pageKey)
+	}
+	if err := page.Add(common.TimestampCandleList(e.Candles).ToCandleList()); err != nil {
+		return errors.Wrapf(err, "InsertCommand: failed (key '%s')", pageKey)
+	}
+	// TODO: Update latest txid
+	return nil
 }
 
 func (e *InsertCommand) targetSet() page.CandleSet {

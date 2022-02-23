@@ -23,6 +23,11 @@ type Database struct {
 
 func NewDatabase(config util.Config) (*Database, error) {
 	db := Database{}
+	db.lock = util.LockSet{
+		Disk:   util.NewRWMutexMap(),
+		Log:    util.NewRWMutexMap(),
+		Memory: util.NewRWMutexMap(),
+	}
 	db.config = config
 	db.Mem.Lock = &db.lock
 	db.Mem.Config = &db.config
@@ -37,7 +42,7 @@ func NewDatabase(config util.Config) (*Database, error) {
 	return &db, nil
 }
 
-func (d *Database) loadPage(set page.CandleSet, lock bool) (page.Page, error) {
+func (d *Database) loadPage(set page.CandleSet, lock bool) (*page.Page, error) {
 	key := set.UniqueKey()
 	var pageLock *sync.RWMutex = nil
 	if lock {
@@ -51,7 +56,7 @@ func (d *Database) loadPage(set page.CandleSet, lock bool) (page.Page, error) {
 		if lock {
 			pageLock.RUnlock()
 		}
-		return *loadedPage, nil
+		return loadedPage, nil
 	}
 
 	if lock {
@@ -61,47 +66,21 @@ func (d *Database) loadPage(set page.CandleSet, lock bool) (page.Page, error) {
 	}
 	loadedPage, err := d.Disk.Read(set)
 	if err != nil {
-		return page.Page{}, errors.Wrap(err, "loadBlock disk read failed")
+		return &page.Page{}, errors.Wrap(err, "loadBlock disk read failed")
 	}
 	if err := d.Mem.Insert(loadedPage); err != nil {
-		return page.Page{}, errors.Wrap(err, "loadBlock memory insert failed")
+		return &page.Page{}, errors.Wrap(err, "loadBlock memory insert failed")
 	}
-
-	return loadedPage, nil
-}
-
-func (d *Database) writePage(set page.CandleSet, candles []common.Candle) error {
-	key := set.UniqueKey()
-	pageLock := d.lock.Memory.Get(key)
-
-	pageLock.Lock()
-	defer pageLock.Unlock()
-	// d.lock.WAL.Lock()
-	// defer d.lock.WAL.Unlock()
-
-	// txID := d.Wal.NextTxID()
-	_, err := d.loadPage(set, false)
-	if err != nil {
-		return errors.Wrap(err, "writePage failed: loading page")
-	}
-	memPage := d.Mem.AccessMemoryPage(set.UniqueKey())
-	if memPage == nil {
-		return errors.New("writePage failed: memPage is nil")
-	}
-
-	// if err := d.Wal.Write(txID, set, candles); err != nil {
-	// 	return errors.Wrap(err, "writePage failed: write to WAL")
-	// }
-	if err := d.Mem.Write(set, candles); err != nil {
-		return errors.Wrap(err, "writePage failed: write to memory")
-	}
-	return nil
+	return d.Mem.Access(key), nil
 }
 
 func (d *Database) executeCommand(cmd command.CommandContent, txId uint64, factory wal.PersistRunner) error {
 	fullCmd := command.NewCommand(txId, cmd)
 	// TODO: Write to mem
 	if err := factory.Write(fullCmd); err != nil {
+		return err
+	}
+	if err := fullCmd.Content.Persist(&pageAccessor{db: d}); err != nil {
 		return err
 	}
 	return nil

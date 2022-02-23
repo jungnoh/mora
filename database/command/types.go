@@ -18,10 +18,15 @@ type Command struct {
 	Content CommandContent
 }
 
+type PageSetAccessor interface {
+	Acquire(set page.CandleSet) (func(), error)
+	Get(set page.CandleSet) (*page.Page, error)
+}
+
 type CommandContent interface {
 	common.SizableBinaryReadWriter
 	TypeId() CommandType
 	TargetSets() []page.CandleSet
-	Persist(pages *map[string]*page.Page) error
+	Persist(accessor PageSetAccessor) error
 	String() string
 }

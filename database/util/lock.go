@@ -22,6 +22,13 @@ type RWMutexMap struct {
 	locks  map[string]*sync.RWMutex
 }
 
+func NewRWMutexMap() RWMutexMap {
+	return RWMutexMap{
+		access: sync.Mutex{},
+		locks:  make(map[string]*sync.RWMutex),
+	}
+}
+
 func (m *RWMutexMap) Get(key string) *sync.RWMutex {
 	m.access.Lock()
 	defer m.access.Unlock()
