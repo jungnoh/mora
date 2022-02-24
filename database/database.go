@@ -1,6 +1,8 @@
 package database
 
 import (
+	"context"
+	"fmt"
 	"sync"
 
 	"github.com/jungnoh/mora/common"
@@ -11,36 +13,68 @@ import (
 	"github.com/jungnoh/mora/database/wal"
 	"github.com/jungnoh/mora/page"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 type Database struct {
-	config util.Config
-	lock   util.LockSet
-	Mem    memory.Memory
-	Disk   disk.Disk
-	Wal    wal.WriteAheadLog
+	config          util.Config
+	lock            util.LockSet
+	Mem             memory.Memory
+	Disk            disk.Disk
+	Wal             wal.WriteAheadLog
+	evcitedNotiChan chan *page.Page
+	ctx             context.Context
+	ctxCancel       context.CancelFunc
 }
 
 func NewDatabase(config util.Config) (*Database, error) {
 	db := Database{}
+	db.ctx, db.ctxCancel = context.WithCancel(context.Background())
 	db.lock = util.LockSet{
 		Disk:   util.NewRWMutexMap(),
 		Log:    util.NewRWMutexMap(),
 		Memory: util.NewRWMutexMap(),
 	}
 	db.config = config
-	db.Mem.Map = make(map[string]*memory.MemoryPage)
-	db.Mem.Lock = &db.lock
-	db.Mem.Config = &db.config
 	db.Disk.Lock = &db.lock
 	db.Disk.Config = &db.config
+	db.evcitedNotiChan = make(chan *page.Page)
+
+	mem, err := memory.NewMemory(config.MaxCleanBlocks, db.evcitedNotiChan)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to initialize memory")
+	}
+	db.Mem = *mem
+	db.Mem.Lock = &db.lock
+	db.Mem.Config = &db.config
 
 	walInstance, err := wal.NewWriteAheadLog(&db.config, &db.lock, &db.Disk)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize WAL")
 	}
 	db.Wal = walInstance
+
+	go db.evict()
 	return &db, nil
+}
+
+func (d *Database) evict() {
+	for {
+		select {
+		case <-d.ctx.Done():
+			return
+		case pg := <-d.evcitedNotiChan:
+			err := d.execEvict(pg)
+			if err != nil {
+				log.Panic().Err(err).Msg("Eviction failed!")
+			}
+		}
+	}
+}
+
+func (d *Database) execEvict(pg *page.Page) error {
+	fmt.Println(*pg)
+	return nil
 }
 
 func (d *Database) loadPage(set page.CandleSet, lock bool) (*page.Page, error) {
@@ -52,12 +86,9 @@ func (d *Database) loadPage(set page.CandleSet, lock bool) (*page.Page, error) {
 	}
 
 	// In cache -> load and return
-	if d.Mem.Exists(key) {
-		loadedPage := d.Mem.Access(key)
-		if lock {
-			pageLock.RUnlock()
-		}
-		return loadedPage, nil
+	pg, ok := d.Mem.GetPage(key)
+	if ok {
+		return pg, nil
 	}
 
 	if lock {
@@ -72,23 +103,16 @@ func (d *Database) loadPage(set page.CandleSet, lock bool) (*page.Page, error) {
 	if loadedPage.IsZero() {
 		loadedPage = page.NewPage(set)
 	}
-	if err := d.Mem.Insert(loadedPage); err != nil {
-		return &page.Page{}, errors.Wrapf(err, "loadBlock memory insert failed (key %s)", key)
-	}
-	finalPtr := d.Mem.Access(key)
-	if finalPtr == nil {
-		panic(errors.Errorf("loadBlock has inserted memory but is still null (key %s)", key))
-	}
-	return finalPtr, nil
+	d.Mem.Insert(&loadedPage)
+	return &loadedPage, nil
 }
 
 func (d *Database) executeCommand(cmd command.CommandContent, txId uint64, factory wal.PersistRunner) error {
 	fullCmd := command.NewCommand(txId, cmd)
-	// TODO: Write to mem
 	if err := factory.Write(fullCmd); err != nil {
 		return err
 	}
-	if err := fullCmd.Content.Persist(&pageAccessor{db: d}); err != nil {
+	if err := fullCmd.Content.Persist(&pageAccessor{db: d, txId: txId}); err != nil {
 		return err
 	}
 	return nil

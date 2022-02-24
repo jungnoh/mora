@@ -1,6 +1,7 @@
 package memory
 
 import (
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/jungnoh/mora/database/util"
 	"github.com/jungnoh/mora/page"
 )
@@ -9,107 +10,45 @@ type Memory struct {
 	Config *util.Config
 	Lock   *util.LockSet
 
-	Map        map[string]*MemoryPage
-	DirtyCount int
-	CleanCount int
-
-	DirtyStart *MemoryPage
-	DirtyEnd   *MemoryPage
-	CleanStart *MemoryPage
-	CleanEnd   *MemoryPage
+	cache   *lru.Cache
+	evicted chan<- *page.Page
 }
 
-type MemoryPage struct {
-	Key             string
-	InLL            bool
-	Dirty           bool
-	Content         page.Page
-	LastFlushedTxId uint64
-
-	PrevLL *MemoryPage
-	NextLL *MemoryPage
-}
-
-func (m *Memory) Exists(key string) bool {
-	m.Lock.MemoryMap.RLock()
-	defer m.Lock.MemoryMap.RUnlock()
-	_, ok := m.Map[key]
-	return ok
-}
-
-func (m *Memory) AccessMemoryPage(key string) *MemoryPage {
-	m.Lock.MemoryMap.RLock()
-	page, ok := m.Map[key]
-	m.Lock.MemoryMap.RUnlock()
-	if ok {
-		m.SetAsClean(page)
-		return page
-	} else {
-		return nil
+func NewMemory(cacheSize int, evictedNotiChan chan *page.Page) (*Memory, error) {
+	mem := &Memory{
+		evicted: evictedNotiChan,
 	}
-}
-
-func (m *Memory) Access(key string) *page.Page {
-	result := m.AccessMemoryPage(key)
-	if result == nil {
-		return nil
+	cache, err := lru.NewWithEvict(cacheSize, func(key, value interface{}) {
+		castKey, keyErr := key.(string)
+		castValue, valueErr := value.(*page.Page)
+		if !keyErr || !valueErr {
+			panic("wrong cache key or value type!")
+		}
+		mem.onEvicted(castKey, castValue)
+	})
+	if err != nil {
+		return nil, err
 	}
-	return &result.Content
+	mem.cache = cache
+	return mem, nil
 }
 
-func (m *Memory) Evict() (evicted bool) {
-	m.Lock.MemoryLL.Lock()
-	defer m.Lock.MemoryLL.Unlock()
+func (m *Memory) onEvicted(key string, value *page.Page) {
+	m.evicted <- value
+}
 
-	if m.CleanEnd == nil {
-		evicted = false
+func (m *Memory) GetPage(key string) (value *page.Page, ok bool) {
+	origValue, origOk := m.cache.Get(key)
+	if !origOk {
+		value, ok = nil, false
 		return
 	}
-	evictingBlock := m.CleanEnd
-	lastBlockLock := m.Lock.Memory.Get(evictingBlock.Key)
-	lastBlockLock.Lock()
-	defer lastBlockLock.Unlock()
-
-	if m.CleanEnd.PrevLL != nil {
-		l2BlockLock := m.Lock.Memory.Get(evictingBlock.PrevLL.Key)
-		l2BlockLock.Lock()
-		evictingBlock.PrevLL.NextLL = nil
-		l2BlockLock.Unlock()
-	}
-	m.CleanEnd = evictingBlock.PrevLL
-	m.CleanCount--
-	delete(m.Map, evictingBlock.Key)
-	evicted = true
+	ok = true
+	value, ok = origValue.(*page.Page)
 	return
 }
 
-func (m *Memory) EvictNeeded() bool {
-	m.Lock.MemoryLL.RLock()
-	defer m.Lock.MemoryLL.RUnlock()
-	return m.CleanCount > m.Config.MaxCleanBlocks
-}
-
-func (m *Memory) Insert(page page.Page) error {
-	if m.EvictNeeded() {
-		m.Evict()
-	}
-
-	pageKey := page.UniqueKey()
-	if m.Exists(pageKey) {
-		return nil
-	}
-
-	m.Lock.MemoryLL.Lock()
-	defer m.Lock.MemoryLL.Unlock()
-
-	m.Lock.MemoryMap.Lock()
-	defer m.Lock.MemoryMap.Unlock()
-	m.Map[pageKey] = &MemoryPage{
-		Key:             pageKey,
-		Content:         page,
-		LastFlushedTxId: page.Header.LastTxId,
-	}
-	m.addToCleanLL(m.Map[pageKey])
-
-	return nil
+func (m *Memory) Insert(value *page.Page) {
+	key := value.UniqueKey()
+	m.cache.Add(key, value)
 }

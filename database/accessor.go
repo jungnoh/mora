@@ -5,7 +5,8 @@ import (
 )
 
 type pageAccessor struct {
-	db *Database
+	db   *Database
+	txId uint64
 }
 
 func (a *pageAccessor) Acquire(set page.CandleSet) (func(), error) {
@@ -16,5 +17,8 @@ func (a *pageAccessor) Acquire(set page.CandleSet) (func(), error) {
 
 func (a *pageAccessor) Get(set page.CandleSet) (*page.Page, error) {
 	pg, err := a.db.loadPage(set, false)
+	if pg.Header.LastTxId < a.txId {
+		pg.Header.LastTxId = a.txId
+	}
 	return pg, err
 }
