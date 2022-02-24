@@ -17,6 +17,8 @@ type WriteAheadLog struct {
 	persister *WalPersister
 	flusher   *WalFlusher
 	flushChan chan bool
+
+	isFlushRunning bool
 }
 
 func NewWriteAheadLog(config *util.Config, lock *util.LockSet, disk *disk.Disk) (WriteAheadLog, error) {
@@ -87,13 +89,24 @@ func (w *WriteAheadLog) listenToFlush() {
 
 func (w *WriteAheadLog) execFlush() error {
 	w.lock.WAL.Lock()
-	defer w.lock.WAL.Unlock()
-
+	if w.isFlushRunning {
+		w.lock.WAL.Unlock()
+		return nil
+	}
+	w.isFlushRunning = true
 	targetFiles, err := w.listFlushTargets()
 	if err != nil {
+		w.lock.WAL.Unlock()
 		return errors.Wrap(err, "failed to list flush targets")
 	}
-	return w.flusher.FlushWal(targetFiles)
+	w.lock.WAL.Unlock()
+
+	err = w.flusher.FlushWal(targetFiles)
+
+	w.lock.WAL.Lock()
+	w.isFlushRunning = false
+	w.lock.WAL.Unlock()
+	return err
 }
 
 func (w *WriteAheadLog) listFlushTargets() ([]string, error) {

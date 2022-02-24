@@ -30,11 +30,7 @@ type Database struct {
 func NewDatabase(config util.Config) (*Database, error) {
 	db := Database{}
 	db.ctx, db.ctxCancel = context.WithCancel(context.Background())
-	db.lock = util.LockSet{
-		Disk:   util.NewRWMutexMap(),
-		Log:    util.NewRWMutexMap(),
-		Memory: util.NewRWMutexMap(),
-	}
+	db.lock = util.NewLockSet()
 	db.config = config
 	db.Disk.Lock = &db.lock
 	db.Disk.Config = &db.config

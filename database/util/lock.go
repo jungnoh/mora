@@ -49,10 +49,17 @@ func (m *RWMutexMap) Get(key string) *sync.RWMutex {
 }
 
 type LockSet struct {
-	Disk      RWMutexMap
-	Log       RWMutexMap
-	Memory    RWMutexMap
-	MemoryMap sync.RWMutex
-	MemoryLL  sync.RWMutex
-	WAL       sync.Mutex
+	Disk     RWMutexMap
+	Log      RWMutexMap
+	WAL      sync.Mutex
+	Memory   RWMutexMap
+	MemoryLL sync.RWMutex
+}
+
+func NewLockSet() LockSet {
+	return LockSet{
+		Disk:   NewRWMutexMap(),
+		Log:    NewRWMutexMap(),
+		Memory: NewRWMutexMap(),
+	}
 }
