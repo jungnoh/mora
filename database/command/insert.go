@@ -113,7 +113,6 @@ func (e *InsertCommand) Persist(accessor PageSetAccessor) error {
 	if err := page.Add(common.TimestampCandleList(e.Candles).ToCandleList()); err != nil {
 		return errors.Wrapf(err, "InsertCommand: failed (key '%s')", pageKey)
 	}
-	// TODO: Update latest txid
 	return nil
 }
 

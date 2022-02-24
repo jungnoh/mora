@@ -19,7 +19,7 @@ import (
 type Database struct {
 	config          util.Config
 	lock            util.LockSet
-	Mem             memory.Memory
+	Mem             *memory.Memory
 	Disk            disk.Disk
 	Wal             wal.WriteAheadLog
 	evcitedNotiChan chan *page.Page
@@ -40,7 +40,7 @@ func NewDatabase(config util.Config) (*Database, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize memory")
 	}
-	db.Mem = *mem
+	db.Mem = mem
 	db.Mem.Lock = &db.lock
 	db.Mem.Config = &db.config
 
@@ -69,7 +69,7 @@ func (d *Database) evict() {
 }
 
 func (d *Database) execEvict(pg *page.Page) error {
-	fmt.Println(*pg)
+	fmt.Println(pg.UniqueKey())
 	return nil
 }
 
@@ -103,12 +103,12 @@ func (d *Database) loadPage(set page.CandleSet, lock bool) (*page.Page, error) {
 	return &loadedPage, nil
 }
 
-func (d *Database) executeCommand(cmd command.CommandContent, txId uint64, factory wal.PersistRunner) error {
+func (d *Database) executeCommand(cmd command.CommandContent, txId uint64, factory wal.PersistRunner, accessor *pageAccessor) error {
 	fullCmd := command.NewCommand(txId, cmd)
 	if err := factory.Write(fullCmd); err != nil {
 		return err
 	}
-	if err := fullCmd.Content.Persist(&pageAccessor{db: d, txId: txId}); err != nil {
+	if err := fullCmd.Content.Persist(accessor); err != nil {
 		return err
 	}
 	return nil
@@ -120,8 +120,10 @@ func (d *Database) Execute(commands []command.CommandContent) error {
 		return errors.Wrap(err, "exec: wal tx start failed")
 	}
 	defer factory.Close()
+	accessor := &pageAccessor{db: d, txId: txId, pages: make(map[string]bool)}
+	defer accessor.Free()
 	for _, cmd := range commands {
-		if err := d.executeCommand(cmd, txId, factory); err != nil {
+		if err := d.executeCommand(cmd, txId, factory, accessor); err != nil {
 			return errors.Wrapf(err, "exec cmd failed: %s", cmd.String())
 		}
 	}

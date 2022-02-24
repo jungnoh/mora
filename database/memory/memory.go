@@ -1,6 +1,9 @@
 package memory
 
 import (
+	"fmt"
+	"sync"
+
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/jungnoh/mora/database/util"
 	"github.com/jungnoh/mora/page"
@@ -12,11 +15,15 @@ type Memory struct {
 
 	cache   *lru.Cache
 	evicted chan<- *page.Page
+
+	memLock    sync.RWMutex
+	refCounter map[string]int
 }
 
 func NewMemory(cacheSize int, evictedNotiChan chan *page.Page) (*Memory, error) {
 	mem := &Memory{
-		evicted: evictedNotiChan,
+		evicted:    evictedNotiChan,
+		refCounter: make(map[string]int),
 	}
 	cache, err := lru.NewWithEvict(cacheSize, func(key, value interface{}) {
 		castKey, keyErr := key.(string)
@@ -34,10 +41,21 @@ func NewMemory(cacheSize int, evictedNotiChan chan *page.Page) (*Memory, error) 
 }
 
 func (m *Memory) onEvicted(key string, value *page.Page) {
-	m.evicted <- value
+	ref := m.getRef(key)
+	fmt.Println(ref)
+	if ref > 0 {
+		fmt.Println("[[[", key)
+		m.Insert(value)
+		fmt.Println("done")
+	} else {
+		m.evicted <- value
+	}
 }
 
 func (m *Memory) GetPage(key string) (value *page.Page, ok bool) {
+	m.memLock.Lock()
+	defer m.memLock.Unlock()
+
 	origValue, origOk := m.cache.Get(key)
 	if !origOk {
 		value, ok = nil, false
@@ -51,4 +69,34 @@ func (m *Memory) GetPage(key string) (value *page.Page, ok bool) {
 func (m *Memory) Insert(value *page.Page) {
 	key := value.UniqueKey()
 	m.cache.Add(key, value)
+}
+
+func (m *Memory) getRef(key string) int {
+	v, ok := m.refCounter[key]
+	if ok {
+		return v
+	}
+	return 0
+}
+
+func (m *Memory) Ref(key string) {
+	m.memLock.Lock()
+	defer m.memLock.Unlock()
+	v, ok := m.refCounter[key]
+	if ok {
+		m.refCounter[key] = v + 1
+	} else {
+		m.refCounter[key] = 1
+	}
+}
+
+func (m *Memory) FreeRef(key string) {
+	m.memLock.Lock()
+	defer m.memLock.Unlock()
+	v, ok := m.refCounter[key]
+	if ok {
+		m.refCounter[key] = v - 1
+	} else {
+		m.refCounter[key] = 0
+	}
 }
