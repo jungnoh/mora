@@ -31,6 +31,15 @@ func (p Page) IsZero() bool {
 	return p.Header.Year == 0
 }
 
+func (p *Page) Copy() Page {
+	copiedBody := make(PageBodyBlockList, len(p.Body))
+	copy(copiedBody, p.Body)
+	return Page{
+		Header: p.Header,
+		Body:   copiedBody,
+	}
+}
+
 func (p *Page) Read(_ uint32, r io.Reader) error {
 	if err := p.Header.Read(0, r); err != nil {
 		return errors.Wrap(err, "failed to read page header")
