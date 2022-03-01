@@ -2,11 +2,12 @@ package storage
 
 import (
 	"context"
-	"errors"
 
 	diskImpl "github.com/jungnoh/mora/database/storage/disk"
 	memImpl "github.com/jungnoh/mora/database/storage/memory"
+	walImpl "github.com/jungnoh/mora/database/storage/wal"
 	"github.com/jungnoh/mora/page"
+	"github.com/pkg/errors"
 
 	"github.com/jungnoh/mora/database/util"
 )
@@ -15,6 +16,7 @@ type Storage struct {
 	config *util.Config
 	disk   diskImpl.Disk
 	memory memImpl.Memory
+	wal    *walImpl.WriteAheadLog
 
 	txLock   *util.RWMutexSet
 	loadLock *util.MutexSet
@@ -36,6 +38,11 @@ func NewStorage(config *util.Config) *Storage {
 		ctx:       ctx,
 		ctxCancel: ctxCancel,
 	}
+	wal, err := walImpl.NewWriteAheadLog(config, &s.disk)
+	if err != nil {
+		panic(err)
+	}
+	s.wal = wal
 	s.startTasks()
 	return &s
 }
@@ -50,15 +57,18 @@ func (s *Storage) Stop() {
 	// TODO: Kill(rollback) active accessors
 }
 
-func (s *Storage) Access(txId uint64) StorageAccessor {
-	return StorageAccessor{
-		txId:     txId,
+func (s *Storage) Access() (StorageAccessor, error) {
+	accessor := StorageAccessor{
 		storage:  s,
 		started:  false,
 		finished: false,
 		readers:  make(map[string]*memImpl.MemoryReader),
 		writers:  make(map[string]*memImpl.MemoryWriter),
 	}
+	if err := accessor.start(); err != nil {
+		return StorageAccessor{}, errors.Wrap(err, "failed to init StorageAccessor")
+	}
+	return accessor, nil
 }
 
 func (s *Storage) checkAndLoad(set page.CandleSet) error {

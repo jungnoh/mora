@@ -1,19 +1,32 @@
 package storage
 
 import (
+	"github.com/jungnoh/mora/database/command"
 	"github.com/jungnoh/mora/database/storage/memory"
+	"github.com/jungnoh/mora/database/storage/wal"
 	"github.com/jungnoh/mora/page"
 	"github.com/pkg/errors"
 )
 
 type StorageAccessor struct {
-	txId     uint64
-	storage  *Storage
-	started  bool
-	finished bool
+	txId       uint64
+	walFactory wal.PersistRunner
+	storage    *Storage
+	started    bool
+	finished   bool
 
 	readers map[string]*memory.MemoryReader
 	writers map[string]*memory.MemoryWriter
+}
+
+func (s *StorageAccessor) start() error {
+	txId, factory, err := s.storage.wal.Begin()
+	if err != nil {
+		return err
+	}
+	s.txId = txId
+	s.walFactory = factory
+	return nil
 }
 
 func (s *StorageAccessor) checkLock() {
@@ -85,8 +98,23 @@ func (s *StorageAccessor) Get(set page.CandleSet) (*page.Page, error) {
 	return nil, errors.Errorf("cannot find page '%s'", key)
 }
 
-func (s *StorageAccessor) Commit() {
+func (s *StorageAccessor) Execute(cmd command.CommandContent) error {
+	fullCmd := command.NewCommand(s.txId, cmd)
+	if err := s.walFactory.Write(fullCmd); err != nil {
+		return err
+	}
+	if err := fullCmd.Content.Persist(s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *StorageAccessor) Commit() error {
 	s.checkUse()
+	defer s.walFactory.Close()
+	if err := s.execCommit(); err != nil {
+		return err
+	}
 	for _, reader := range s.readers {
 		reader.Done()
 	}
@@ -94,10 +122,19 @@ func (s *StorageAccessor) Commit() {
 		writer.Commit()
 	}
 	s.finished = true
+	return nil
+}
+
+func (s *StorageAccessor) execCommit() error {
+	if err := s.walFactory.Write(command.NewCommand(s.txId, &command.CommitCommand{})); err != nil {
+		return errors.Wrap(err, "failed to log commit")
+	}
+	return nil
 }
 
 func (s *StorageAccessor) Rollback() {
 	s.checkUse()
+	defer s.walFactory.Close()
 	for _, reader := range s.readers {
 		reader.Done()
 	}
@@ -105,4 +142,11 @@ func (s *StorageAccessor) Rollback() {
 		writer.Rollback()
 	}
 	s.finished = true
+}
+
+// Stub methods to implement database.pageAccessor
+func (s *StorageAccessor) Acquire(set page.CandleSet) (func(), error) {
+	return func() {}, nil
+}
+func (s *StorageAccessor) Free() {
 }

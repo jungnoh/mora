@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/jungnoh/mora/database/command"
-	"github.com/jungnoh/mora/database/disk"
+	"github.com/jungnoh/mora/database/storage/disk"
 	"github.com/jungnoh/mora/database/util"
 	"github.com/jungnoh/mora/page"
 	"github.com/pkg/errors"
