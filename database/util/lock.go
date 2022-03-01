@@ -154,19 +154,3 @@ func (s *RWMutexSet) LockX(key string) func() {
 		unlocked = true
 	}
 }
-
-type LockSet struct {
-	Disk     RWMutexMap
-	Log      RWMutexMap
-	WAL      sync.Mutex
-	Memory   RWMutexMap
-	MemoryLL sync.RWMutex
-}
-
-func NewLockSet() LockSet {
-	return LockSet{
-		Disk:   NewRWMutexMap(),
-		Log:    NewRWMutexMap(),
-		Memory: NewRWMutexMap(),
-	}
-}

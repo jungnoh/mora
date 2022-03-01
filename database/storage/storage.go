@@ -31,12 +31,15 @@ func NewStorage(config *util.Config) *Storage {
 	ctx, ctxCancel := context.WithCancel(context.Background())
 
 	s := Storage{
-		config:    config,
-		txLock:    util.NewRWMutexSet("storageTx"),
-		disk:      diskImpl.NewDisk(config),
-		memory:    memImpl.Memory{},
-		ctx:       ctx,
-		ctxCancel: ctxCancel,
+		config:        config,
+		txLock:        util.NewRWMutexSet("storageTx"),
+		loadLock:      util.NewMutexSet("load"),
+		disk:          diskImpl.NewDisk(config),
+		memory:        memImpl.Memory{},
+		ctx:           ctx,
+		ctxCancel:     ctxCancel,
+		diskLoadChan:  make(chan diskLoadRequest),
+		diskStoreChan: make(chan diskStoreRequest),
 	}
 	wal, err := walImpl.NewWriteAheadLog(config, &s.disk)
 	if err != nil {
@@ -75,7 +78,6 @@ func (s *Storage) checkAndLoad(set page.CandleSet) error {
 	key := set.UniqueKey()
 	unlock := s.loadLock.Lock(key)
 	defer unlock()
-
 	exists := s.memory.HasPage(set)
 	if exists {
 		return nil
@@ -86,6 +88,8 @@ func (s *Storage) checkAndLoad(set page.CandleSet) error {
 	}
 	if exists {
 		s.memory.ForceWrite(set, &loaded)
+	} else {
+		s.memory.Init(set)
 	}
 	return nil
 }

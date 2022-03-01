@@ -6,6 +6,7 @@ import (
 	"github.com/jungnoh/mora/database/storage/wal"
 	"github.com/jungnoh/mora/page"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 type StorageAccessor struct {
@@ -26,6 +27,7 @@ func (s *StorageAccessor) start() error {
 	}
 	s.txId = txId
 	s.walFactory = factory
+	log.Debug().Uint64("id", s.txId).Msg("Tx START")
 	return nil
 }
 
@@ -111,6 +113,7 @@ func (s *StorageAccessor) Execute(cmd command.CommandContent) error {
 
 func (s *StorageAccessor) Commit() error {
 	s.checkUse()
+	log.Debug().Uint64("id", s.txId).Msg("Tx COMMIT")
 	defer s.walFactory.Close()
 	if err := s.execCommit(); err != nil {
 		return err
@@ -134,6 +137,7 @@ func (s *StorageAccessor) execCommit() error {
 
 func (s *StorageAccessor) Rollback() {
 	s.checkUse()
+	log.Debug().Uint64("id", s.txId).Msg("Tx ROLLBACK")
 	defer s.walFactory.Close()
 	for _, reader := range s.readers {
 		reader.Done()
@@ -142,6 +146,13 @@ func (s *StorageAccessor) Rollback() {
 		writer.Rollback()
 	}
 	s.finished = true
+}
+
+func (s *StorageAccessor) RollbackIfActive() {
+	if !s.started || s.finished {
+		return
+	}
+	s.Rollback()
 }
 
 // Stub methods to implement database.pageAccessor

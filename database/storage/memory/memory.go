@@ -18,8 +18,8 @@ func (m *Memory) StartWrite(txId uint64, set common.UniqueKeyable) MemoryWriter 
 	return newMemoryWriter(txId, page)
 }
 
-func (m *Memory) ForceWrite(set common.UniqueKeyable, content *page.Page) (added bool) {
-	added = m.data.AddIfNew(set, content)
+func (m *Memory) ForceWrite(set common.UniqueKeyable, content *page.Page) (added bool, err error) {
+	added, err = m.data.AddIfNew(set, content)
 	return
 }
 
@@ -32,4 +32,8 @@ func (m *Memory) Read(txId uint64, set common.UniqueKeyable) (reader MemoryReade
 	reader = newMemoryReader(txId, page)
 	ok = true
 	return
+}
+
+func (m *Memory) Init(set page.CandleSet) {
+	m.data.InitIfNew(set)
 }

@@ -1,21 +1,27 @@
 package storage
 
-import "github.com/jungnoh/mora/page"
+import (
+	"github.com/jungnoh/mora/page"
+)
 
 func (s *Storage) processDiskLoads() {
-	select {
-	case <-s.ctx.Done():
-		break
-	case req := <-s.diskLoadChan:
-		req.Response <- s.processDiskLoad(&req)
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case req := <-s.diskLoadChan:
+			req.Response <- s.processDiskLoad(&req)
+		}
 	}
 }
 func (s *Storage) processDiskStores() {
-	select {
-	case <-s.ctx.Done():
-		break
-	case req := <-s.diskStoreChan:
-		req.Response <- s.processDiskStore(&req)
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case req := <-s.diskStoreChan:
+			req.Response <- s.processDiskStore(&req)
+		}
 	}
 }
 
