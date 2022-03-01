@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/jungnoh/mora/database/command"
-	"github.com/jungnoh/mora/database/disk"
+	"github.com/jungnoh/mora/database/storage/disk"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )

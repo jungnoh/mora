@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/jungnoh/mora/common"
@@ -39,14 +40,37 @@ func main() {
 			Code:         code,
 			CandleLength: 60,
 		}, cds)
+
+		accessor, err := db.Storage.Access()
+		if err != nil {
+			panic(err)
+		}
+		targetSet := page.CandleSet{
+			Year: uint16(now.Year()),
+			CandleSetWithoutYear: page.CandleSetWithoutYear{
+				MarketCode:   "UPBIT",
+				Code:         code,
+				CandleLength: 60,
+			},
+		}
+		if err := accessor.AddRead(targetSet); err != nil {
+			panic(err)
+		}
+		accessor.Start()
+		pg, err := accessor.Get(targetSet)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(pg.Body)
+		accessor.Rollback()
 	}
 
 	go testMe(time.Date(2021, time.January, 1, 0, 0, 0, 0, time.UTC), "ETH")
-	go testMe(time.Date(2021, time.July, 1, 0, 0, 0, 0, time.UTC), "BTC")
-	go testMe(time.Date(2022, time.January, 1, 0, 0, 0, 0, time.UTC), "BTC")
-	go testMe(time.Date(2022, time.July, 1, 0, 0, 0, 0, time.UTC), "BTC")
-	// <-make(chan bool)
+	// go testMe(time.Date(2021, time.July, 1, 0, 0, 0, 0, time.UTC), "BTC")
+	// go testMe(time.Date(2022, time.January, 1, 0, 0, 0, 0, time.UTC), "BTC")
+	// go testMe(time.Date(2022, time.July, 1, 0, 0, 0, 0, time.UTC), "BTC")
+	<-make(chan bool)
 
-	db.Wal.Flush()
+	db.Storage.FlushWal()
 	<-make(chan bool)
 }

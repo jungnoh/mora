@@ -1,31 +1,33 @@
 package wal
 
 import (
-	"github.com/jungnoh/mora/database/disk"
+	"sync"
+
+	"github.com/jungnoh/mora/database/storage/disk"
 	"github.com/jungnoh/mora/database/util"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
 
 type WriteAheadLog struct {
-	config *util.Config
-	lock   *util.LockSet
-	disk   *disk.Disk
-
+	config    *util.Config
+	disk      *disk.Disk
 	resolver  WalFileResolver
 	counter   *WalCounter
 	persister *WalPersister
-	flusher   *WalFlusher
-	flushChan chan bool
+
+	accessLock sync.Mutex
+	flusher    *WalFlusher
+	flushChan  chan bool
 
 	isFlushRunning bool
 }
 
-func NewWriteAheadLog(config *util.Config, lock *util.LockSet, disk *disk.Disk) (WriteAheadLog, error) {
+func NewWriteAheadLog(config *util.Config, disk *disk.Disk) (*WriteAheadLog, error) {
 	resolver := WalFileResolver{Config: config}
 	counter := WalCounter{}
 	if err := counter.Open(resolver.Counter()); err != nil {
-		return WriteAheadLog{}, err
+		return &WriteAheadLog{}, err
 	}
 	persister := WalPersister{
 		Disk:         disk,
@@ -33,14 +35,13 @@ func NewWriteAheadLog(config *util.Config, lock *util.LockSet, disk *disk.Disk) 
 		Counter:      &counter,
 	}
 	if err := persister.Setup(); err != nil {
-		return WriteAheadLog{}, err
+		return &WriteAheadLog{}, err
 	}
 
 	flusher := NewWalFlusher(&resolver, disk)
 
 	wal := WriteAheadLog{
 		config:    config,
-		lock:      lock,
 		disk:      disk,
 		counter:   &counter,
 		persister: &persister,
@@ -49,7 +50,7 @@ func NewWriteAheadLog(config *util.Config, lock *util.LockSet, disk *disk.Disk) 
 		flushChan: make(chan bool),
 	}
 	go wal.listenToFlush()
-	return wal, nil
+	return &wal, nil
 }
 
 func (w *WriteAheadLog) Close() {
@@ -61,8 +62,8 @@ func (w *WriteAheadLog) Flush() {
 }
 
 func (w *WriteAheadLog) Begin() (uint64, PersistRunner, error) {
-	w.lock.WAL.Lock()
-	defer w.lock.WAL.Unlock()
+	w.accessLock.Lock()
+	defer w.accessLock.Unlock()
 
 	txId, err := w.counter.Next()
 	if err != nil {
@@ -88,24 +89,24 @@ func (w *WriteAheadLog) listenToFlush() {
 }
 
 func (w *WriteAheadLog) execFlush() error {
-	w.lock.WAL.Lock()
+	w.accessLock.Lock()
 	if w.isFlushRunning {
-		w.lock.WAL.Unlock()
+		w.accessLock.Unlock()
 		return nil
 	}
 	w.isFlushRunning = true
 	targetFiles, err := w.listFlushTargets()
 	if err != nil {
-		w.lock.WAL.Unlock()
+		w.accessLock.Unlock()
 		return errors.Wrap(err, "failed to list flush targets")
 	}
-	w.lock.WAL.Unlock()
+	w.accessLock.Unlock()
 
 	err = w.flusher.FlushWal(targetFiles)
 
-	w.lock.WAL.Lock()
+	w.accessLock.Lock()
 	w.isFlushRunning = false
-	w.lock.WAL.Unlock()
+	w.accessLock.Unlock()
 	return err
 }
 
