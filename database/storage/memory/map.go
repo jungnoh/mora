@@ -50,3 +50,13 @@ func (p *pageMap) InitIfNew(set page.CandleSet) (added bool) {
 	added = !loaded
 	return
 }
+
+func (p *pageMap) Range(exec func(page *memoryPage) bool) {
+	p.data.Range(func(key, value interface{}) bool {
+		return exec(value.(*memoryPage))
+	})
+}
+
+func (p *pageMap) Delete(set common.UniqueKeyable) {
+	p.data.Delete(set.UniqueKey())
+}

@@ -1,12 +1,20 @@
 package memory
 
 import (
+	"sync"
+
 	"github.com/jungnoh/mora/common"
 	"github.com/jungnoh/mora/page"
+	"github.com/rs/zerolog/log"
 )
+
+type EvictionFunc func(dirty bool, content *page.Page) (shouldEvict bool, err error)
 
 type Memory struct {
 	data pageMap
+
+	evictCheckLock sync.Mutex
+	evictRunning   bool
 }
 
 func (m *Memory) HasPage(set common.UniqueKeyable) bool {
@@ -36,4 +44,37 @@ func (m *Memory) Read(txId uint64, set common.UniqueKeyable) (reader MemoryReade
 
 func (m *Memory) Init(set page.CandleSet) {
 	m.data.InitIfNew(set)
+}
+
+func (m *Memory) RangeForEviction(fn EvictionFunc) {
+	m.evictCheckLock.Lock()
+	if m.evictRunning {
+		log.Info().Msg("Memory eviction is already running. Will not run")
+		m.evictCheckLock.Unlock()
+		return
+	}
+	m.evictRunning = true
+	m.evictCheckLock.Unlock()
+	defer func() {
+		m.evictCheckLock.Lock()
+		m.evictRunning = false
+		m.evictCheckLock.Unlock()
+	}()
+
+	m.data.Range(func(pg *memoryPage) bool {
+		unlock := pg.lockForFlush()
+		defer unlock()
+		shouldEvict, err := fn(pg.dirty, pg.content)
+
+		if err != nil {
+			log.Warn().Err(err).Msg("Eviction run failed!")
+			return false
+		}
+		if shouldEvict {
+			log.Debug().Str("key", pg.content.UniqueKey()).Msg("evicting")
+			m.data.Delete(pg.content)
+		}
+		return true
+	})
+	log.Info().Msg("Memory eviction complete")
 }
