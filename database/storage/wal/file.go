@@ -22,12 +22,6 @@ func NewWalWriteFile(fd *os.File, filename string) WalWriteFile {
 	}
 }
 
-type walWriteBuilder struct {
-	committed bool
-	txId      uint64
-	file      *WalWriteFile
-}
-
 func (w *WalWriteFile) Open(file string) error {
 	w.fileLock.Lock()
 	defer w.fileLock.Unlock()

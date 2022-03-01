@@ -23,21 +23,6 @@ func (f *flusherTransaction) AddEntry(e command.Command) {
 	f.Entries = append(f.Entries, e)
 }
 
-func (f *flusherTransaction) NeededPages() []page.CandleSet {
-	result := make(map[string]page.CandleSet)
-	for _, entry := range f.Entries {
-		sets := entry.Content.TargetSets()
-		for _, set := range sets {
-			result[set.UniqueKey()] = set
-		}
-	}
-	v := make([]page.CandleSet, 0, len(result))
-	for _, value := range result {
-		v = append(v, value)
-	}
-	return v
-}
-
 type flusherAccessor struct {
 	f *WalFlusher
 }
@@ -127,38 +112,44 @@ func (w *WalFlusher) processFromDisk(file string) error {
 }
 
 func (w *WalFlusher) flushToMemory(tx *flusherTransaction) error {
-	neededPages := tx.NeededPages()
-	for _, set := range neededPages {
-		// Acquire lock
-		pageKey := set.UniqueKey()
-		lock := w.loadedPagesLock.Get(pageKey)
-		lock.Lock()
-		defer lock.Unlock()
+	for _, entry := range tx.Entries {
+		targetSets := entry.Content.TargetSets()
+		minTxId := uint64(0x7fffffffffffffff)
+		for _, set := range targetSets {
+			pageKey := set.UniqueKey()
+			if _, ok := w.loadedPages[pageKey]; !ok {
+				// TODO: Only read header before determining skip
+				lock := w.loadedPagesLock.Get(pageKey)
+				lock.Lock()
+				defer lock.Unlock()
 
-		// Load into memory if needed
-		if _, ok := w.loadedPages[pageKey]; !ok {
-			loadedPage, err := w.Disk.Read(set)
-			if err != nil {
-				return errors.Wrapf(err, "failed to load page with key '%s' (tx=%d)", pageKey, tx.TxId)
+				loadedPage, err := w.Disk.Read(set)
+				if err != nil {
+					return errors.Wrapf(err, "failed to load page with key '%s' (tx=%d)", pageKey, tx.TxId)
+				}
+				if loadedPage.IsZero() {
+					loadedPage = page.NewPage(set)
+				}
+				w.loadedPages[pageKey] = &loadedPage
 			}
-			if loadedPage.IsZero() {
-				loadedPage = page.NewPage(set)
+			if minTxId > w.loadedPages[pageKey].Header.LastTxId {
+				minTxId = w.loadedPages[pageKey].Header.LastTxId
 			}
-			w.loadedPages[pageKey] = &loadedPage
 		}
-
-		// Update TxId
-		if w.loadedPages[pageKey].Header.LastTxId < tx.TxId {
-			w.loadedPages[pageKey].Header.LastTxId = tx.TxId
+		if minTxId >= entry.TxID {
+			log.Debug().Uint64("txId", entry.TxID).Stringer("entry", entry.Content).Msg("Skipping")
+			continue
 		}
-	}
-
-	for _, e := range tx.Entries {
-		if err := e.Content.Persist(&flusherAccessor{f: w}); err != nil {
+		for _, set := range targetSets {
+			pageKey := set.UniqueKey()
+			if w.loadedPages[pageKey].Header.LastTxId < tx.TxId {
+				w.loadedPages[pageKey].Header.LastTxId = tx.TxId
+			}
+		}
+		if err := entry.Content.Persist(&flusherAccessor{f: w}); err != nil {
 			return errors.Wrapf(err, "failed to persist (tx=%d)", tx.TxId)
 		}
 	}
-
 	return nil
 }
 
