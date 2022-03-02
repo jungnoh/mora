@@ -83,9 +83,9 @@ func (w *WriteAheadLog) listenToFlush() {
 	for range w.flushChan {
 		err := w.execFlush()
 		if err != nil {
-			log.Warn().Err(err).Msg("failed to flush write ahead log")
+			log.Warn().Err(err).Msg("Failed to flush write ahead log")
 		} else {
-			log.Debug().Msg("flushing write ahead log complete")
+			log.Debug().Msg("WAL flush complete")
 			select {
 			case w.FlushDoneChan <- true:
 			default:

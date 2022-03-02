@@ -73,7 +73,6 @@ func (m *Memory) RangeForEviction(fn EvictionFunc) {
 			return false
 		}
 		if shouldEvict {
-			log.Debug().Str("key", pg.content.UniqueKey()).Msg("evicting")
 			m.data.Delete(pg.content)
 		}
 		return !quit

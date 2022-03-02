@@ -19,7 +19,7 @@ func (s *Storage) EvictMemory(reason MemoryEvictionReason) MemoryEvictionResult 
 	result.PagesCountBeforeEvict = pageCount
 
 	if pageCount <= s.config.MaxMemoryPages {
-		log.Info().Stringer("result", result).Stringer("reason", reason).Msg("eviction complete: nothing to evict")
+		log.Info().Stringer("result", result).Stringer("reason", reason).Msg("Eviction complete: nothing to evict")
 		return result
 	}
 
@@ -45,7 +45,7 @@ func (s *Storage) EvictMemory(reason MemoryEvictionReason) MemoryEvictionResult 
 		}
 		return
 	})
-	log.Info().Stringer("result", result).Stringer("reason", reason).Msg("eviction complete")
+	log.Info().Stringer("result", result).Stringer("reason", reason).Msg("Eviction complete")
 	return result
 }
 

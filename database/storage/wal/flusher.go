@@ -54,7 +54,7 @@ func NewWalFlusher(resolver *WalFileResolver, disk *disk.Disk) WalFlusher {
 
 func (w *WalFlusher) FlushWal(files []string) error {
 	for _, file := range files {
-		log.Debug().Str("file", file).Msg("flushing log")
+		log.Debug().Str("file", file).Msg("Flushing WAL log")
 		w.loadedPages = make(map[string]*page.Page)
 		w.loadedPagesLock = util.NewMutexMap()
 		if err := w.processFromDisk(file); err != nil {
@@ -90,7 +90,7 @@ func (w *WalFlusher) processFromDisk(file string) error {
 		}
 		if e.Type == command.CommitCommandType {
 			readResult[e.TxID].Committed = true
-			log.Debug().Uint64("tx", e.TxID).Msg("committing")
+			log.Debug().Uint64("tx", e.TxID).Msg("Committing log")
 			if err := w.flushToMemory(readResult[e.TxID]); err != nil {
 				return err
 			}
@@ -137,7 +137,7 @@ func (w *WalFlusher) flushToMemory(tx *flusherTransaction) error {
 			}
 		}
 		if minTxId >= entry.TxID {
-			log.Debug().Uint64("txId", entry.TxID).Stringer("entry", entry.Content).Msg("Skipping")
+			log.Debug().Uint64("txId", entry.TxID).Stringer("entry", entry.Content).Msg("Skipping log commit")
 			continue
 		}
 		for _, set := range targetSets {
