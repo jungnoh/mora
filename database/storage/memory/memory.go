@@ -77,7 +77,6 @@ func (m *Memory) RangeForEviction(fn EvictionFunc) {
 		}
 		return !quit
 	})
-	log.Info().Msg("Memory eviction complete")
 }
 
 func (m *Memory) StatsForEviction(maxPages int) (pageCount int, thresholdHitCount int) {
