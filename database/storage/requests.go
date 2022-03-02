@@ -13,12 +13,14 @@ type diskStoreResponse struct {
 }
 
 type diskLoadRequest struct {
-	Key      page.CandleSet
-	Response chan diskLoadResponse
+	Key        page.CandleSet
+	Response   chan diskLoadResponse
+	HeaderOnly bool
 }
 
 type diskLoadResponse struct {
-	Error   error
-	Exists  bool
-	Content page.Page
+	Error      error
+	Exists     bool
+	HeaderOnly bool
+	Content    page.Page
 }

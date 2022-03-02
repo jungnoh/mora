@@ -28,6 +28,9 @@ func (d *Disk) ReadHeader(set page.CandleSet) (page.PageHeader, error) {
 	path := d.filePath.FileFromSet(set)
 	f, err := os.Open(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return page.PageHeader{}, nil
+		}
 		return page.PageHeader{}, errors.Wrapf(err, "read header fail (key '%s')", key)
 	}
 	defer f.Close()

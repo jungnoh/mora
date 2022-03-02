@@ -26,17 +26,38 @@ func (s *Storage) processDiskStores() {
 }
 
 func (s *Storage) processDiskLoad(req *diskLoadRequest) diskLoadResponse {
-	result, err := s.disk.Read(req.Key)
-	if err != nil {
-		return diskLoadResponse{
-			Error:  err,
-			Exists: false,
+	if req.HeaderOnly {
+		result, err := s.disk.ReadHeader(req.Key)
+		if err != nil {
+			return diskLoadResponse{
+				Error:      err,
+				HeaderOnly: true,
+				Exists:     false,
+			}
 		}
-	}
-	return diskLoadResponse{
-		Error:   nil,
-		Exists:  !result.IsZero(),
-		Content: result,
+		return diskLoadResponse{
+			Error:      nil,
+			HeaderOnly: true,
+			Exists:     !result.IsZero(),
+			Content: page.Page{
+				Header: result,
+			},
+		}
+	} else {
+		result, err := s.disk.Read(req.Key)
+		if err != nil {
+			return diskLoadResponse{
+				Error:      err,
+				HeaderOnly: false,
+				Exists:     false,
+			}
+		}
+		return diskLoadResponse{
+			Error:      nil,
+			HeaderOnly: false,
+			Exists:     !result.IsZero(),
+			Content:    result,
+		}
 	}
 }
 
@@ -51,8 +72,9 @@ func (s *Storage) diskLoad(set page.CandleSet) (content page.Page, exists bool, 
 	responseChan := make(chan diskLoadResponse)
 	defer close(responseChan)
 	s.diskLoadChan <- diskLoadRequest{
-		Key:      set,
-		Response: responseChan,
+		Key:        set,
+		Response:   responseChan,
+		HeaderOnly: false,
 	}
 	result := <-responseChan
 	if result.Error != nil {
@@ -61,6 +83,25 @@ func (s *Storage) diskLoad(set page.CandleSet) (content page.Page, exists bool, 
 		return
 	}
 	content = result.Content
+	exists = result.Exists
+	return
+}
+
+func (s *Storage) diskLoadHeader(set page.CandleSet) (header page.PageHeader, exists bool, err error) {
+	responseChan := make(chan diskLoadResponse)
+	defer close(responseChan)
+	s.diskLoadChan <- diskLoadRequest{
+		Key:        set,
+		Response:   responseChan,
+		HeaderOnly: true,
+	}
+	result := <-responseChan
+	if result.Error != nil {
+		exists = false
+		err = result.Error
+		return
+	}
+	header = result.Content.Header
 	exists = result.Exists
 	return
 }

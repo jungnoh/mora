@@ -133,3 +133,18 @@ func (p PageHeader) GetLastTime() time.Time {
 func (p PageHeader) GetLastTimestamp() int64 {
 	return int64(p.EndOffset) + common.GetStartOfYearTimestamp(int(p.Year))
 }
+
+func (p PageHeader) IsZero() bool {
+	return p.Year == 0
+}
+
+func (p PageHeader) ToCandleSet() CandleSet {
+	return CandleSet{
+		Year: p.Year,
+		CandleSetWithoutYear: CandleSetWithoutYear{
+			MarketCode:   p.MarketCode,
+			Code:         p.Code,
+			CandleLength: p.CandleLength,
+		},
+	}
+}
