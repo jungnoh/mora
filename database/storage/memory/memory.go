@@ -2,7 +2,6 @@ package memory
 
 import (
 	"container/heap"
-	"fmt"
 	"sync"
 
 	"github.com/jungnoh/mora/common"
@@ -88,7 +87,6 @@ func (m *Memory) StatsForEviction(maxPages int) (pageCount int, thresholdHitCoun
 
 	pageCount = 0
 	m.data.Range(func(pg *memoryPage) bool {
-		fmt.Println(pg.contentKey(), pg.hitCount)
 		pageCount++
 		heap.Push(&h, pg.hitCount)
 		return true

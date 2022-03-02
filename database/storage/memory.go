@@ -1,26 +1,25 @@
 package storage
 
 import (
-	"fmt"
+	"time"
 
 	"github.com/jungnoh/mora/page"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
-type MemoryEvictionResult struct {
-	PageCountBeforeEvict int
-	EvictedCount         int
-	AccessedPageCount    int
-	Error                error
-}
+func (s *Storage) EvictMemory(reason MemoryEvictionReason) MemoryEvictionResult {
+	defer func() {
+		s.resetEvictionChan <- true
+	}()
 
-func (s *Storage) EvictMemory() MemoryEvictionResult {
 	result := MemoryEvictionResult{}
 	pageCount, thresholdHitCount := s.memory.StatsForEviction(s.config.MaxMemoryPages)
 	evictedCount := 0
-	result.PageCountBeforeEvict = pageCount
+	result.PagesCountBeforeEvict = pageCount
 
 	if pageCount <= s.config.MaxMemoryPages {
+		log.Info().Stringer("result", result).Stringer("reason", reason).Msg("eviction complete: nothing to evict")
 		return result
 	}
 
@@ -44,9 +43,9 @@ func (s *Storage) EvictMemory() MemoryEvictionResult {
 		if err != nil {
 			result.Error = err
 		}
-		fmt.Println(content.UniqueKey(), shouldEvict)
 		return
 	})
+	log.Info().Stringer("result", result).Stringer("reason", reason).Msg("eviction complete")
 	return result
 }
 
@@ -63,4 +62,18 @@ func (s *Storage) evictPage(content *page.Page) error {
 		return errors.Wrap(err, "failed to writeback")
 	}
 	return nil
+}
+
+func (s *Storage) runPeriodicalEviction() {
+	ticker := time.NewTicker(s.config.EvictionInterval)
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+			s.EvictMemory(PeriodicalEvictionReason)
+		case <-s.resetEvictionChan:
+			ticker.Reset(s.config.EvictionInterval)
+		}
+	}
 }

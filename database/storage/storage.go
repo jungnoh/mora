@@ -21,25 +21,27 @@ type Storage struct {
 	txLock   *util.RWMutexSet
 	loadLock *util.MutexSet
 
-	ctx           context.Context
-	ctxCancel     context.CancelFunc
-	diskLoadChan  chan diskLoadRequest
-	diskStoreChan chan diskStoreRequest
+	ctx               context.Context
+	ctxCancel         context.CancelFunc
+	diskLoadChan      chan diskLoadRequest
+	diskStoreChan     chan diskStoreRequest
+	resetEvictionChan chan bool
 }
 
 func NewStorage(config *util.Config) *Storage {
 	ctx, ctxCancel := context.WithCancel(context.Background())
 
 	s := Storage{
-		config:        config,
-		txLock:        util.NewRWMutexSet("storageTx"),
-		loadLock:      util.NewMutexSet("load"),
-		disk:          diskImpl.NewDisk(config),
-		memory:        memImpl.Memory{},
-		ctx:           ctx,
-		ctxCancel:     ctxCancel,
-		diskLoadChan:  make(chan diskLoadRequest),
-		diskStoreChan: make(chan diskStoreRequest),
+		config:            config,
+		txLock:            util.NewRWMutexSet("storageTx"),
+		loadLock:          util.NewMutexSet("load"),
+		disk:              diskImpl.NewDisk(config),
+		memory:            memImpl.Memory{},
+		ctx:               ctx,
+		ctxCancel:         ctxCancel,
+		diskLoadChan:      make(chan diskLoadRequest),
+		diskStoreChan:     make(chan diskStoreRequest),
+		resetEvictionChan: make(chan bool),
 	}
 	wal, err := walImpl.NewWriteAheadLog(config, &s.disk)
 	if err != nil {
@@ -53,6 +55,7 @@ func NewStorage(config *util.Config) *Storage {
 func (s *Storage) startTasks() {
 	go s.processDiskLoads()
 	go s.processDiskStores()
+	go s.runPeriodicalEviction()
 }
 
 func (s *Storage) Stop() {
