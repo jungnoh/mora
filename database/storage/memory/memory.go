@@ -1,6 +1,8 @@
 package memory
 
 import (
+	"container/heap"
+	"fmt"
 	"sync"
 
 	"github.com/jungnoh/mora/common"
@@ -8,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type EvictionFunc func(dirty bool, content *page.Page) (shouldEvict bool, err error)
+type EvictionFunc func(dirty bool, hitCount int, content *page.Page) (shouldEvict bool, quit bool, err error)
 
 type Memory struct {
 	data pageMap
@@ -64,7 +66,8 @@ func (m *Memory) RangeForEviction(fn EvictionFunc) {
 	m.data.Range(func(pg *memoryPage) bool {
 		unlock := pg.lockForFlush()
 		defer unlock()
-		shouldEvict, err := fn(pg.dirty, pg.content)
+		shouldEvict, quit, err := fn(pg.dirty, pg.hitCount, pg.content)
+		pg.hitCount = 0
 
 		if err != nil {
 			log.Warn().Err(err).Msg("Eviction run failed!")
@@ -74,7 +77,29 @@ func (m *Memory) RangeForEviction(fn EvictionFunc) {
 			log.Debug().Str("key", pg.content.UniqueKey()).Msg("evicting")
 			m.data.Delete(pg.content)
 		}
-		return true
+		return !quit
 	})
 	log.Info().Msg("Memory eviction complete")
+}
+
+func (m *Memory) StatsForEviction(maxPages int) (pageCount int, thresholdHitCount int) {
+	h := make(MaxHeap, 0)
+	heap.Init(&h)
+
+	pageCount = 0
+	m.data.Range(func(pg *memoryPage) bool {
+		fmt.Println(pg.contentKey(), pg.hitCount)
+		pageCount++
+		heap.Push(&h, pg.hitCount)
+		return true
+	})
+
+	if pageCount < maxPages {
+		thresholdHitCount = 0
+		return
+	}
+	for i := 0; i < maxPages && len(h) > 0; i++ {
+		thresholdHitCount = heap.Pop(&h).(int)
+	}
+	return
 }

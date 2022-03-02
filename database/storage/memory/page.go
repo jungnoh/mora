@@ -13,6 +13,7 @@ type UnlockFunc func()
 type memoryPage struct {
 	accessLock sync.RWMutex
 	dirty      bool
+	hitCount   int
 	content    *page.Page
 }
 
@@ -34,6 +35,7 @@ func (d *memoryPage) lockS(txId uint64) UnlockFunc {
 	d.logLocking(txId, "S", "Trying to lock")
 	d.accessLock.RLock()
 	d.logLocking(txId, "S", "Locked")
+	d.hitCount++
 
 	unlocked := false
 	return func() {
@@ -54,6 +56,7 @@ func (d *memoryPage) lockX(txId uint64) UnlockFunc {
 	d.accessLock.Lock()
 	d.logLocking(txId, "X", "Locked")
 	d.dirty = true
+	d.hitCount++
 
 	unlocked := false
 	return func() {
