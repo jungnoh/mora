@@ -22,14 +22,14 @@ func (d *memoryPage) contentKey() string {
 	return d.content.UniqueKey()
 }
 
-func (d *memoryPage) logLocking(mode, message string) {
-	log.Debug().Str("key", d.contentKey()).Str("set", "memory").Str("mode", mode).Msg(message)
+func (d *memoryPage) logLocking(txId uint64, mode, message string) {
+	log.Debug().Uint64("txId", txId).Str("key", d.contentKey()).Str("set", "memory").Str("mode", mode).Msg(message)
 }
 
-func (d *memoryPage) lockS() UnlockFunc {
-	d.logLocking("S", "Trying to lock")
+func (d *memoryPage) lockS(txId uint64) UnlockFunc {
+	d.logLocking(txId, "S", "Trying to lock")
 	d.accessLock.RLock()
-	d.logLocking("S", "Locked")
+	d.logLocking(txId, "S", "Locked")
 
 	unlocked := false
 	return func() {
@@ -37,15 +37,15 @@ func (d *memoryPage) lockS() UnlockFunc {
 			return
 		}
 		unlocked = true
-		d.logLocking("S", "Unlocking")
+		d.logLocking(txId, "S", "Unlocking")
 		d.accessLock.RUnlock()
 	}
 }
 
-func (d *memoryPage) lockX() UnlockFunc {
-	d.logLocking("X", "Trying to lock")
+func (d *memoryPage) lockX(txId uint64) UnlockFunc {
+	d.logLocking(txId, "X", "Trying to lock")
 	d.accessLock.Lock()
-	d.logLocking("X", "Locked")
+	d.logLocking(txId, "X", "Locked")
 	d.dirty = true
 
 	unlocked := false
@@ -54,15 +54,15 @@ func (d *memoryPage) lockX() UnlockFunc {
 			return
 		}
 		unlocked = true
-		d.logLocking("X", "Unlocking")
+		d.logLocking(txId, "X", "Unlocking")
 		d.accessLock.Unlock()
 	}
 }
 
 func (d *memoryPage) lockForFlush() UnlockFunc {
-	d.logLocking("F", "Trying to lock")
+	d.logLocking(0, "F", "Trying to lock")
 	d.accessLock.Lock()
-	d.logLocking("F", "Locked")
+	d.logLocking(0, "F", "Locked")
 
 	unlocked := false
 	return func() {
@@ -70,7 +70,7 @@ func (d *memoryPage) lockForFlush() UnlockFunc {
 			return
 		}
 		unlocked = true
-		d.logLocking("F", "Unlocking")
+		d.logLocking(0, "F", "Unlocking")
 		d.accessLock.Unlock()
 	}
 }

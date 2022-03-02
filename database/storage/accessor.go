@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"sort"
+
 	"github.com/jungnoh/mora/database/command"
 	"github.com/jungnoh/mora/database/storage/memory"
 	"github.com/jungnoh/mora/database/storage/wal"
@@ -9,6 +11,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type accessorNeededPage struct {
+	set       page.CandleSet
+	exclusive bool
+}
+
 type StorageAccessor struct {
 	txId       uint64
 	walFactory wal.PersistRunner
@@ -16,19 +23,9 @@ type StorageAccessor struct {
 	started    bool
 	finished   bool
 
+	todo    map[string]accessorNeededPage
 	readers map[string]*memory.MemoryReader
 	writers map[string]*memory.MemoryWriter
-}
-
-func (s *StorageAccessor) start() error {
-	txId, factory, err := s.storage.wal.Begin()
-	if err != nil {
-		return err
-	}
-	s.txId = txId
-	s.walFactory = factory
-	log.Debug().Uint64("id", s.txId).Msg("Tx START")
-	return nil
 }
 
 func (s *StorageAccessor) checkLock() {
@@ -49,43 +46,58 @@ func (s *StorageAccessor) checkUse() {
 	}
 }
 
-func (s *StorageAccessor) AddRead(set page.CandleSet) error {
+func (s *StorageAccessor) AddRead(set page.CandleSet) {
 	s.checkLock()
 	key := set.UniqueKey()
-	if _, ok := s.writers[key]; ok {
-		panic(errors.Errorf("trying to Slock '%s' after Xlock", key))
+	s.todo[key] = accessorNeededPage{
+		set:       set,
+		exclusive: true,
 	}
-	if _, ok := s.readers[key]; ok {
-		return nil
-	}
-	reader, err := s.storage.read(s.txId, set)
-	if err != nil {
-		return err
-	}
-	s.readers[key] = &reader
-	return nil
 }
 
-func (s *StorageAccessor) AddWrite(set page.CandleSet) error {
+func (s *StorageAccessor) AddWrite(set page.CandleSet) {
 	s.checkLock()
 	key := set.UniqueKey()
-	if _, ok := s.readers[key]; ok {
-		panic(errors.Errorf("trying to Xlock '%s' after Slock", key))
+	s.todo[key] = accessorNeededPage{
+		set:       set,
+		exclusive: true,
 	}
-	if _, ok := s.writers[key]; ok {
-		return nil
-	}
-	writer, err := s.storage.write(s.txId, set)
-	if err != nil {
-		return err
-	}
-	s.writers[key] = &writer
-	return nil
 }
 
-func (s *StorageAccessor) Start() {
+func (s *StorageAccessor) Start() error {
 	s.checkLock()
+
+	txId, factory, err := s.storage.wal.Begin()
+	if err != nil {
+		return errors.Wrap(err, "failed to start transaction")
+	}
+	s.txId = txId
+	s.walFactory = factory
+	log.Debug().Uint64("id", s.txId).Msg("Tx START")
+
+	keys := make([]string, len(s.todo))
+	for key := range s.todo {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if s.todo[key].exclusive {
+			writer, err := s.storage.write(s.txId, s.todo[key].set)
+			if err != nil {
+				return errors.Wrapf(err, "failed to open write for set '%s'", key)
+			}
+			s.writers[key] = &writer
+		} else {
+			reader, err := s.storage.read(s.txId, s.todo[key].set)
+			if err != nil {
+				return errors.Wrapf(err, "failed to open read for set '%s'", key)
+			}
+			s.readers[key] = &reader
+		}
+	}
+
 	s.started = true
+	return nil
 }
 
 func (s *StorageAccessor) Get(set page.CandleSet) (*page.Page, error) {

@@ -10,7 +10,7 @@ type MemoryWriter struct {
 }
 
 func newMemoryWriter(txId uint64, ptr *memoryPage) MemoryWriter {
-	unlock := ptr.lockX()
+	unlock := ptr.lockX(txId)
 	w := MemoryWriter{
 		original: ptr,
 		txId:     txId,

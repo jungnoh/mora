@@ -7,8 +7,8 @@ type MemoryReader struct {
 	unlockFn UnlockFunc
 }
 
-func newMemoryReader(_ uint64, ptr *memoryPage) MemoryReader {
-	unlock := ptr.lockS()
+func newMemoryReader(txId uint64, ptr *memoryPage) MemoryReader {
+	unlock := ptr.lockS(txId)
 	r := MemoryReader{
 		pg:       ptr,
 		unlockFn: unlock,

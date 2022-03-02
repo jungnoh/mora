@@ -63,7 +63,9 @@ func (d *Database) Execute(commands []command.CommandContent) error {
 			accessor.AddWrite(set)
 		}
 	}
-	accessor.Start()
+	if err := accessor.Start(); err != nil {
+		return errors.Wrapf(err, "failed to start")
+	}
 	for _, cmd := range commands {
 		if err := accessor.Execute(cmd); err != nil {
 			return errors.Wrapf(err, "failed to execute command '%s'", cmd.String())

@@ -65,11 +65,9 @@ func (s *Storage) Access() (StorageAccessor, error) {
 		storage:  s,
 		started:  false,
 		finished: false,
+		todo:     make(map[string]accessorNeededPage),
 		readers:  make(map[string]*memImpl.MemoryReader),
 		writers:  make(map[string]*memImpl.MemoryWriter),
-	}
-	if err := accessor.start(); err != nil {
-		return StorageAccessor{}, errors.Wrap(err, "failed to init StorageAccessor")
 	}
 	return accessor, nil
 }
