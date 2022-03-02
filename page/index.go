@@ -1,6 +1,10 @@
 package page
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/pkg/errors"
+)
 
 type PageIndex []uint32
 
@@ -23,6 +27,13 @@ type CandleSet struct {
 	Year uint16
 }
 
+func (p CandleSet) IsZero() bool {
+	return p.Year == 0
+}
+
 func (p CandleSet) UniqueKey() string {
+	if p.IsZero() {
+		panic(errors.New("cannot determine key of zero set"))
+	}
 	return fmt.Sprintf("%s^%s^%d^%d", p.MarketCode, p.Code, p.CandleLength, p.Year)
 }

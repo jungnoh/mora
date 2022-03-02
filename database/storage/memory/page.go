@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/jungnoh/mora/page"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -27,6 +28,9 @@ func (d *memoryPage) logLocking(txId uint64, mode, message string) {
 }
 
 func (d *memoryPage) lockS(txId uint64) UnlockFunc {
+	if d.content == nil || d.content.IsZero() {
+		panic(errors.New("trying to lock nil or zero page"))
+	}
 	d.logLocking(txId, "S", "Trying to lock")
 	d.accessLock.RLock()
 	d.logLocking(txId, "S", "Locked")
@@ -43,6 +47,9 @@ func (d *memoryPage) lockS(txId uint64) UnlockFunc {
 }
 
 func (d *memoryPage) lockX(txId uint64) UnlockFunc {
+	if d.content == nil || d.content.IsZero() {
+		panic(errors.New("trying to lock nil or zero page"))
+	}
 	d.logLocking(txId, "X", "Trying to lock")
 	d.accessLock.Lock()
 	d.logLocking(txId, "X", "Locked")
@@ -60,6 +67,9 @@ func (d *memoryPage) lockX(txId uint64) UnlockFunc {
 }
 
 func (d *memoryPage) lockForFlush() UnlockFunc {
+	if d.content == nil || d.content.IsZero() {
+		panic(errors.New("trying to lock nil or zero page"))
+	}
 	d.logLocking(0, "F", "Trying to lock")
 	d.accessLock.Lock()
 	d.logLocking(0, "F", "Locked")

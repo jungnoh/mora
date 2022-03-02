@@ -142,5 +142,8 @@ func (p *Page) merge(candles common.CandleList) error {
 }
 
 func (p Page) UniqueKey() string {
+	if p.IsZero() {
+		panic(errors.New("cannot determine key of zero page"))
+	}
 	return fmt.Sprintf("%s^%s^%d^%d", p.Header.MarketCode, p.Header.Code, p.Header.CandleLength, p.Header.Year)
 }

@@ -75,7 +75,7 @@ func (s *StorageAccessor) Start() error {
 	s.walFactory = factory
 	log.Debug().Uint64("id", s.txId).Msg("Tx START")
 
-	keys := make([]string, len(s.todo))
+	keys := make([]string, 0, len(s.todo))
 	for key := range s.todo {
 		keys = append(keys, key)
 	}
