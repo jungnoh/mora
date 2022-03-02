@@ -10,14 +10,17 @@ func (m MemoryEvictionReason) String() string {
 		return "USER"
 	case PeriodicalEvictionReason:
 		return "PERIODICAL"
+	case AfterWalFlushEvictionReason:
+		return "AFTER_WAL_FLUSH"
 	default:
 		return "UNKNOWN"
 	}
 }
 
 const (
-	UserTriggerEvictionReason MemoryEvictionReason = 1
-	PeriodicalEvictionReason  MemoryEvictionReason = 2
+	UserTriggerEvictionReason   MemoryEvictionReason = 1
+	PeriodicalEvictionReason    MemoryEvictionReason = 2
+	AfterWalFlushEvictionReason MemoryEvictionReason = 3
 )
 
 type MemoryEvictionResult struct {

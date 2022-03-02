@@ -16,9 +16,10 @@ type WriteAheadLog struct {
 	counter   *WalCounter
 	persister *WalPersister
 
-	accessLock sync.Mutex
-	flusher    *WalFlusher
-	flushChan  chan bool
+	accessLock    sync.Mutex
+	flusher       *WalFlusher
+	flushChan     chan bool
+	FlushDoneChan chan bool
 
 	isFlushRunning bool
 }
@@ -41,13 +42,14 @@ func NewWriteAheadLog(config *util.Config, disk *disk.Disk) (*WriteAheadLog, err
 	flusher := NewWalFlusher(&resolver, disk)
 
 	wal := WriteAheadLog{
-		config:    config,
-		disk:      disk,
-		counter:   &counter,
-		persister: &persister,
-		flusher:   &flusher,
-		resolver:  resolver,
-		flushChan: make(chan bool),
+		config:        config,
+		disk:          disk,
+		counter:       &counter,
+		persister:     &persister,
+		flusher:       &flusher,
+		resolver:      resolver,
+		flushChan:     make(chan bool),
+		FlushDoneChan: make(chan bool),
 	}
 	go wal.listenToFlush()
 	return &wal, nil
@@ -84,6 +86,10 @@ func (w *WriteAheadLog) listenToFlush() {
 			log.Warn().Err(err).Msg("failed to flush write ahead log")
 		} else {
 			log.Debug().Msg("flushing write ahead log complete")
+			select {
+			case w.FlushDoneChan <- true:
+			default:
+			}
 		}
 	}
 }

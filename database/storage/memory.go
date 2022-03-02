@@ -77,3 +77,14 @@ func (s *Storage) runPeriodicalEviction() {
 		}
 	}
 }
+
+func (s *Storage) monitorWalFlushDone() {
+	for {
+		select {
+		case <-s.wal.FlushDoneChan:
+			s.EvictMemory(AfterWalFlushEvictionReason)
+		case <-s.ctx.Done():
+			return
+		}
+	}
+}

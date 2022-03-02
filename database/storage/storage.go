@@ -56,6 +56,7 @@ func (s *Storage) startTasks() {
 	go s.processDiskLoads()
 	go s.processDiskStores()
 	go s.runPeriodicalEviction()
+	go s.monitorWalFlushDone()
 }
 
 func (s *Storage) Stop() {
