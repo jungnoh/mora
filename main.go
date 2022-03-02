@@ -5,20 +5,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/jungnoh/mora/common"
 	"github.com/jungnoh/mora/database"
 	"github.com/jungnoh/mora/database/util"
 	"github.com/jungnoh/mora/page"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
-func demo() {
-	cfg := util.Config{
-		Directory:        "/Users/mac/db",
-		MaxMemoryPages:   2,
-		EvictionInterval: 60 * time.Second,
-	}
+func demo(cfg util.Config) {
 	db, err := database.NewDatabase(cfg)
 	if err != nil {
 		panic(err)
@@ -91,6 +88,7 @@ func demo() {
 
 func main() {
 	debug := flag.Bool("debug", false, "sets log level to debug")
+	configFile := flag.String("config", "config.yaml", "config file")
 	flag.Parse()
 
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
@@ -99,5 +97,10 @@ func main() {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
-	demo()
+	config := util.Config{}
+	if err := cleanenv.ReadConfig(*configFile, &config); err != nil {
+		panic(errors.Wrap(err, "failed to read config"))
+	}
+
+	demo(config)
 }

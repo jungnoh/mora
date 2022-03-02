@@ -65,7 +65,7 @@ func (s *Storage) evictPage(content *page.Page) error {
 }
 
 func (s *Storage) runPeriodicalEviction() {
-	ticker := time.NewTicker(s.config.EvictionInterval)
+	ticker := time.NewTicker(time.Duration(s.config.EvictionInterval) * time.Second)
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -73,7 +73,7 @@ func (s *Storage) runPeriodicalEviction() {
 		case <-ticker.C:
 			s.EvictMemory(PeriodicalEvictionReason)
 		case <-s.resetEvictionChan:
-			ticker.Reset(s.config.EvictionInterval)
+			ticker.Reset(time.Duration(s.config.EvictionInterval) * time.Second)
 		}
 	}
 }
