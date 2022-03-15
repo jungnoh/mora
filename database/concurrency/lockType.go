@@ -53,7 +53,7 @@ func LockTypesCanBeParent(parent, child LockType) bool {
 	return false
 }
 
-// LockTypesSubstitutable returns if a lock with type 'have' can be substitute a lock with type 'want'.
+// LockTypesSubstitutable returns if a lock with type 'have' can substitute a lock with type 'want'.
 func LockTypesSubstitutable(have, want LockType) bool {
 	if have == want {
 		return true

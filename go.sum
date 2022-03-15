@@ -2,6 +2,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/toml v1.0.0 h1:dtDWrepsVPfW9H/4y7dDgFc2MBUSeJhlaDtK13CxFlU=
 github.com/BurntSushi/toml v1.0.0/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/coreos/go-systemd/v22 v22.3.2/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
+github.com/gammazero/deque v0.1.1 h1:xRVkDuSvDmFuMGf3IquHuRc2jlL0+v/WpFCWaauzwbE=
+github.com/gammazero/deque v0.1.1/go.mod h1:KQw7vFau1hHuM8xmI9RbgKFbAsQFWmBpqQ2KenFLk6M=
 github.com/godbus/dbus/v5 v5.0.4/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
 github.com/ilyakaznacheev/cleanenv v1.2.6 h1:oJRaVZfAI0xdA5LJNguuKH2ldVJg44SP8GqkEn/cw7w=
 github.com/ilyakaznacheev/cleanenv v1.2.6/go.mod h1:C3bB+MJ+LjECYlw2k7CSagKGfL1Ym2ywfjj40RjXJ24=
