@@ -42,6 +42,31 @@ func (l *LockManager) Release(txId TransactionId, name ResourceName) error {
 	}
 	resource := l.getResourceEntry(name)
 	resource.Release(txId)
+	l.txLocks.DeleteResource(txId, name)
+	return nil
+}
+
+func (l *LockManager) AcquireThenRelease(txId TransactionId, name ResourceName, lockType LockType, releases []ResourceName) error {
+	for _, release := range releases {
+		if !l.txLocks.ContainsResource(txId, release) {
+			return errors.Errorf("tx does not hold lock on '%s'", release)
+		}
+	}
+
+	wantedLock := Lock{Transaction: txId, Name: name, Type: lockType}
+	if l.txLocks.Contains(wantedLock) {
+		return errors.New("tx already has wanted lock")
+	}
+	resource := l.getResourceEntry(name)
+	ack := make(chan bool)
+	go resource.AddToQueue(lockRequest{Lock: wantedLock, Ack: ack}, false)
+	<-ack
+
+	for _, release := range releases {
+		if err := l.Release(txId, release); err != nil {
+			return errors.Wrapf(err, "error releasing (%d,%s)", txId, release)
+		}
+	}
 	return nil
 }
 
@@ -63,4 +88,9 @@ func (l *LockManager) Promote(txId TransactionId, name ResourceName, newLockType
 	go resourceEntry.AddToQueue(lockRequest{Lock: wantedLock, Ack: ack}, false)
 	<-ack
 	return nil
+}
+
+func (l *LockManager) LockType(txId TransactionId, name ResourceName) LockType {
+	entry := l.getResourceEntry(name)
+	return entry.TransactionLockType(txId)
 }
