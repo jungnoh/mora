@@ -47,9 +47,9 @@ func NewMultiLevelLock(manager *LockManager, parent *MultiLevelLock, key Resourc
 		panic("parent and child have different managers")
 	}
 	if parent != nil {
-		lock.name = parent.name.Child(key)
+		lock.name = parent.name.CreateChild(key)
 	} else {
-		lock.name = ResourceName(key)
+		lock.name = NewResourceName([]ResourceNamePart{key})
 	}
 	return &lock
 }

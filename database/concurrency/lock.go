@@ -12,7 +12,7 @@ type LockList []Lock
 
 func (l LockList) Contains(lock Lock) bool {
 	for _, v := range l {
-		if v.Name == lock.Name && v.Transaction == lock.Transaction && v.Type == lock.Type {
+		if v.Name.hashValue == lock.Name.hashValue && v.Transaction == lock.Transaction && v.Type == lock.Type {
 			return true
 		}
 	}
@@ -20,7 +20,7 @@ func (l LockList) Contains(lock Lock) bool {
 }
 
 type TransactionLockMap struct {
-	data map[TransactionId]map[ResourceName][]LockType
+	data map[TransactionId]map[uint64][]LockType
 	lock sync.Mutex
 }
 
@@ -29,15 +29,15 @@ func (m *TransactionLockMap) LockTypes(txId TransactionId, name ResourceName) []
 	defer m.lock.Unlock()
 
 	if _, ok := m.data[txId]; !ok {
-		m.data[txId] = make(map[ResourceName][]LockType)
-		m.data[txId][name] = make([]LockType, 0)
+		m.data[txId] = make(map[uint64][]LockType)
+		m.data[txId][name.hashValue] = make([]LockType, 0)
 		return []LockType{}
 	}
-	if _, ok := m.data[txId][name]; !ok {
-		m.data[txId][name] = make([]LockType, 0)
+	if _, ok := m.data[txId][name.hashValue]; !ok {
+		m.data[txId][name.hashValue] = make([]LockType, 0)
 		return []LockType{}
 	}
-	return m.data[txId][name]
+	return m.data[txId][name.hashValue]
 }
 
 func (m *TransactionLockMap) Contains(lock Lock) bool {
@@ -45,15 +45,15 @@ func (m *TransactionLockMap) Contains(lock Lock) bool {
 	defer m.lock.Unlock()
 
 	if _, ok := m.data[lock.Transaction]; !ok {
-		m.data[lock.Transaction] = make(map[ResourceName][]LockType)
-		m.data[lock.Transaction][lock.Name] = make([]LockType, 0)
+		m.data[lock.Transaction] = make(map[uint64][]LockType)
+		m.data[lock.Transaction][lock.Name.hashValue] = make([]LockType, 0)
 		return false
 	}
-	if _, ok := m.data[lock.Transaction][lock.Name]; !ok {
-		m.data[lock.Transaction][lock.Name] = make([]LockType, 0)
+	if _, ok := m.data[lock.Transaction][lock.Name.hashValue]; !ok {
+		m.data[lock.Transaction][lock.Name.hashValue] = make([]LockType, 0)
 		return false
 	}
-	for _, v := range m.data[lock.Transaction][lock.Name] {
+	for _, v := range m.data[lock.Transaction][lock.Name.hashValue] {
 		if v == lock.Type {
 			return true
 		}
@@ -66,15 +66,15 @@ func (m *TransactionLockMap) ContainsResource(txId TransactionId, name ResourceN
 	defer m.lock.Unlock()
 
 	if _, ok := m.data[txId]; !ok {
-		m.data[txId] = make(map[ResourceName][]LockType)
-		m.data[txId][name] = make([]LockType, 0)
+		m.data[txId] = make(map[uint64][]LockType)
+		m.data[txId][name.hashValue] = make([]LockType, 0)
 		return false
 	}
-	if _, ok := m.data[txId][name]; !ok {
-		m.data[txId][name] = make([]LockType, 0)
+	if _, ok := m.data[txId][name.hashValue]; !ok {
+		m.data[txId][name.hashValue] = make([]LockType, 0)
 		return false
 	}
-	return len(m.data[txId][name]) > 0
+	return len(m.data[txId][name.hashValue]) > 0
 }
 
 func (m *TransactionLockMap) DeleteResource(txId TransactionId, name ResourceName) {
@@ -84,5 +84,5 @@ func (m *TransactionLockMap) DeleteResource(txId TransactionId, name ResourceNam
 	if _, ok := m.data[txId]; !ok {
 		return
 	}
-	delete(m.data[txId], name)
+	delete(m.data[txId], name.hashValue)
 }

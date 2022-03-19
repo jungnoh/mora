@@ -8,7 +8,7 @@ import (
 
 type LockManager struct {
 	txLocks     TransactionLockMap
-	entries     map[ResourceName]*LockEntry
+	entries     map[uint64]*LockEntry
 	entriesLock sync.Mutex
 }
 
@@ -16,10 +16,10 @@ func (l *LockManager) getResourceEntry(name ResourceName) *LockEntry {
 	l.entriesLock.Lock()
 	defer l.entriesLock.Unlock()
 
-	if _, ok := l.entries[name]; !ok {
-		l.entries[name] = NewLockEntry(name, &l.txLocks)
+	if _, ok := l.entries[name.hashValue]; !ok {
+		l.entries[name.hashValue] = NewLockEntry(name, &l.txLocks)
 	}
-	return l.entries[name]
+	return l.entries[name.hashValue]
 }
 
 func (l *LockManager) Acquire(txId TransactionId, name ResourceName, lockType LockType) error {

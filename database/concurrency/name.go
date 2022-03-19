@@ -1,19 +1,72 @@
 package concurrency
 
-import "strings"
+import (
+	"bytes"
+	"hash/fnv"
+)
 
-type ResourceNamePart string
+func NewResourceNamePart(value string) ResourceNamePart {
+	h := fnv.New64()
+	h.Write([]byte(value))
+	return ResourceNamePart{
+		Value:     value,
+		hashValue: h.Sum64(),
+	}
+}
 
-type ResourceName string
+func NewResourceName(parts []ResourceNamePart) ResourceName {
+	h := fnv.New64()
+	for _, part := range parts {
+		h.Write([]byte(part.Value))
+	}
+	return ResourceName{
+		Parts:     parts,
+		hashValue: h.Sum64(),
+	}
+}
 
-func (r ResourceName) Child(key ResourceNamePart) ResourceName {
-	return r + "/" + ResourceName(key)
+type ResourceNamePart struct {
+	Value     string
+	hashValue uint64
+}
+
+func (r ResourceNamePart) Hash() uint64 {
+	return r.hashValue
+}
+
+func (r ResourceNamePart) String() string {
+	return r.Value
+}
+
+type ResourceName struct {
+	Parts     []ResourceNamePart
+	hashValue uint64
+}
+
+func (r ResourceName) Hash() uint64 {
+	return r.hashValue
 }
 
 func (r ResourceName) LastPart() ResourceNamePart {
-	lastIndex := strings.LastIndex(string(r), "/")
-	if lastIndex == -1 {
-		return ""
+	return ResourceNamePart(r.Parts[len(r.Parts)-1])
+}
+
+func (r ResourceName) CreateChild(key ResourceNamePart) ResourceName {
+	newParts := make([]ResourceNamePart, len(r.Parts)+1)
+	copy(newParts, r.Parts)
+	newParts[len(r.Parts)] = key
+	return NewResourceName(newParts)
+}
+
+func (r ResourceName) String() string {
+	var buf bytes.Buffer
+	buf.WriteString("<")
+	for i, arg := range r.Parts {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(arg.Value)
 	}
-	return ResourceNamePart(r[lastIndex+1:])
+	buf.WriteString(">")
+	return buf.String()
 }
