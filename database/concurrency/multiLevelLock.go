@@ -36,7 +36,6 @@ func releaseLockIfSIS(txId TransactionId, lock *MultiLevelLock) error {
 	return nil
 }
 
-//TODO: Race while creating lock with same key?
 func NewMultiLevelLock(manager *LockManager, parent *MultiLevelLock, key ResourceNamePart) *MultiLevelLock {
 	lock := MultiLevelLock{
 		manager:             manager,
@@ -52,6 +51,29 @@ func NewMultiLevelLock(manager *LockManager, parent *MultiLevelLock, key Resourc
 		lock.name = NewResourceName([]ResourceNamePart{key})
 	}
 	return &lock
+}
+
+func (m *MultiLevelLock) EffectiveLockType(txId TransactionId) LockType {
+	if lockType := m.LockType(txId); lockType != NoLock {
+		return lockType
+	}
+	parentLock := m.parent
+	for parentLock != nil {
+		lockType := parentLock.manager.LockType(txId, parentLock.name)
+		if lockType == NoLock {
+			parentLock = parentLock.parent
+			continue
+		}
+		if lockType == ISLock || lockType == IXLock {
+			break
+		}
+		return lockType
+	}
+	return NoLock
+}
+
+func (m *MultiLevelLock) LockType(txId TransactionId) LockType {
+	return m.manager.LockType(txId, m.name)
 }
 
 func (m *MultiLevelLock) Acquire(txId TransactionId, lockType LockType) error {
@@ -85,7 +107,7 @@ func (m *MultiLevelLock) Release(txId TransactionId) error {
 }
 
 func (m *MultiLevelLock) Promote(txId TransactionId, newLockType LockType) error {
-	prevLockType := m.manager.LockType(txId, m.name)
+	prevLockType := m.LockType(txId)
 	if prevLockType == newLockType {
 		return errors.New("lock type cannot be same")
 	}
@@ -116,7 +138,7 @@ func (m *MultiLevelLock) Promote(txId TransactionId, newLockType LockType) error
 }
 
 func (m *MultiLevelLock) Esclate(txId TransactionId) error {
-	prevLockType := m.manager.LockType(txId, m.name)
+	prevLockType := m.LockType(txId)
 	if prevLockType == SLock || prevLockType == XLock {
 		return nil
 	}
@@ -134,7 +156,7 @@ func (m *MultiLevelLock) Esclate(txId TransactionId) error {
 	traverseChildren(txId, m, &traverseStep)
 
 	var releaseErr error = nil
-	if m.manager.LockType(txId, m.name) == ISLock {
+	if m.LockType(txId) == ISLock {
 		releaseErr = m.manager.AcquireThenRelease(txId, m.name, SLock, toRelease)
 	} else {
 		releaseErr = m.manager.AcquireThenRelease(txId, m.name, XLock, toRelease)

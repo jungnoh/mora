@@ -20,14 +20,18 @@ func (l LockList) Contains(lock Lock) bool {
 }
 
 type TransactionLockMap struct {
-	data map[TransactionId]map[uint64][]LockType
-	lock sync.Mutex
+	data          map[TransactionId]map[uint64][]LockType
+	resourceNames map[uint64]ResourceName
+	lock          sync.Mutex
 }
 
 func (m *TransactionLockMap) LockTypes(txId TransactionId, name ResourceName) []LockType {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	if _, ok := m.resourceNames[name.hashValue]; !ok {
+		m.resourceNames[name.hashValue] = name
+	}
 	if _, ok := m.data[txId]; !ok {
 		m.data[txId] = make(map[uint64][]LockType)
 		m.data[txId][name.hashValue] = make([]LockType, 0)
@@ -44,6 +48,9 @@ func (m *TransactionLockMap) Contains(lock Lock) bool {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	if _, ok := m.resourceNames[lock.Name.hashValue]; !ok {
+		m.resourceNames[lock.Name.hashValue] = lock.Name
+	}
 	if _, ok := m.data[lock.Transaction]; !ok {
 		m.data[lock.Transaction] = make(map[uint64][]LockType)
 		m.data[lock.Transaction][lock.Name.hashValue] = make([]LockType, 0)
@@ -65,6 +72,9 @@ func (m *TransactionLockMap) ContainsResource(txId TransactionId, name ResourceN
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	if _, ok := m.resourceNames[name.hashValue]; !ok {
+		m.resourceNames[name.hashValue] = name
+	}
 	if _, ok := m.data[txId]; !ok {
 		m.data[txId] = make(map[uint64][]LockType)
 		m.data[txId][name.hashValue] = make([]LockType, 0)
@@ -81,8 +91,25 @@ func (m *TransactionLockMap) DeleteResource(txId TransactionId, name ResourceNam
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	if _, ok := m.resourceNames[name.hashValue]; !ok {
+		m.resourceNames[name.hashValue] = name
+	}
 	if _, ok := m.data[txId]; !ok {
 		return
 	}
 	delete(m.data[txId], name.hashValue)
+}
+
+func (m *TransactionLockMap) AllResources(txId TransactionId) []ResourceName {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if _, ok := m.data[txId]; !ok {
+		return []ResourceName{}
+	}
+	result := make([]ResourceName, 0, len(m.data[txId]))
+	for resourceHash := range m.data[txId] {
+		result = append(result, m.resourceNames[resourceHash])
+	}
+	return result
 }

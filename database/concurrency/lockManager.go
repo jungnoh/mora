@@ -3,6 +3,7 @@ package concurrency
 import (
 	"sync"
 
+	errSlice "github.com/carlmjohnson/errors"
 	"github.com/pkg/errors"
 )
 
@@ -32,17 +33,6 @@ func (l *LockManager) Acquire(txId TransactionId, name ResourceName, lockType Lo
 	}
 	go resource.AddToQueue(lockRequest{Lock: wantedLock, Ack: ack}, false)
 	<-ack
-	return nil
-}
-
-func (l *LockManager) Release(txId TransactionId, name ResourceName) error {
-	// TODO: Update LockManager map state
-	if l.txLocks.ContainsResource(txId, name) {
-		return errors.New("Transaction does not have lock on this resource")
-	}
-	resource := l.getResourceEntry(name)
-	resource.Release(txId)
-	l.txLocks.DeleteResource(txId, name)
 	return nil
 }
 
@@ -88,6 +78,24 @@ func (l *LockManager) Promote(txId TransactionId, name ResourceName, newLockType
 	go resourceEntry.AddToQueue(lockRequest{Lock: wantedLock, Ack: ack}, false)
 	<-ack
 	return nil
+}
+
+func (l *LockManager) Release(txId TransactionId, name ResourceName) error {
+	if l.txLocks.ContainsResource(txId, name) {
+		return errors.New("Transaction does not have lock on this resource")
+	}
+	resource := l.getResourceEntry(name)
+	resource.Release(txId)
+	l.txLocks.DeleteResource(txId, name)
+	return nil
+}
+
+func (l *LockManager) ReleaseAll(txId TransactionId) error {
+	var errs errSlice.Slice
+	for _, resource := range l.txLocks.AllResources(txId) {
+		errs.Push(l.Release(txId, resource))
+	}
+	return errs.Merge()
 }
 
 func (l *LockManager) LockType(txId TransactionId, name ResourceName) LockType {
