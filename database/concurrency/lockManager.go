@@ -59,7 +59,7 @@ func (l *LockManager) AcquireThenRelease(txId TransactionId, name ResourceName, 
 
 	for _, release := range releases {
 		if err := l.Release(txId, release); err != nil {
-			return errors.Wrapf(err, "error releasing (%d,%s)", txId, release)
+			return errors.Wrapf(err, "error releasing (%d, %s)", txId, release)
 		}
 	}
 	return nil
@@ -88,7 +88,7 @@ func (l *LockManager) Promote(txId TransactionId, name ResourceName, newLockType
 
 func (l *LockManager) Release(txId TransactionId, name ResourceName) error {
 	log.Debug().Uint64("txId", uint64(txId)).Stringer("resource", name).Msg("Release")
-	if l.txLocks.ContainsResource(txId, name) {
+	if !l.txLocks.ContainsResource(txId, name) {
 		return errors.New("Transaction does not have lock on this resource")
 	}
 	resource := l.getResourceEntry(name)
