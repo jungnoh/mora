@@ -184,6 +184,12 @@ func (m *MultiLevelLock) printAllLocks(heading string) {
 	for txId, lock := range m.manager.getResourceEntry(m.name).locks {
 		fmt.Printf("%d/%s ", txId, lock.Type.String())
 	}
+	fmt.Printf("<- [")
+	queue := m.manager.getResourceEntry(m.name).queue.queue
+	for i := 0; i < queue.Len(); i++ {
+		at := queue.At(i).(lockRequest)
+		fmt.Printf("%d/%s ", at.Lock.Transaction, at.Lock.Type)
+	}
 	fmt.Printf("\n")
 	for _, child := range m.childrenLockCounter.children {
 		child.printAllLocks(heading + " ")
