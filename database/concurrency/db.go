@@ -56,9 +56,7 @@ type DatabaseLock struct {
 
 func NewDatabaseLock() *DatabaseLock {
 	manager := LockManager{
-		txLocks: TransactionLockMap{
-			data: make(map[TransactionId]map[uint64][]LockType),
-		},
+		txLocks: NewTransactionLockMap(),
 		entries: make(map[uint64]*LockEntry),
 	}
 	return &DatabaseLock{
@@ -100,12 +98,21 @@ func (d *DatabaseLock) EnsureLock(txId TransactionId, resource ResourceName, loc
 	}
 
 	if lockType == SLock {
-		return d.acquireSIntent(txId, lock)
+		if err := d.acquireSIntent(txId, lock.parent); err != nil {
+			return err
+		}
+		return lock.Acquire(txId, SLock)
 	}
-	return d.acquireXIntent(txId, lock)
+	if err := d.acquireXIntent(txId, lock.parent); err != nil {
+		return err
+	}
+	return lock.Acquire(txId, XLock)
 }
 
 func (d *DatabaseLock) acquireSIntent(txId TransactionId, lock *MultiLevelLock) error {
+	if lock == nil {
+		return nil
+	}
 	lockType := lock.LockType(txId)
 	if lockType == SLock || lockType == SIXLock || lockType == XLock {
 		panic(errors.Errorf("unexpected ancestor lock '%s' while acquiring IS", lockType))
@@ -123,6 +130,9 @@ func (d *DatabaseLock) acquireSIntent(txId TransactionId, lock *MultiLevelLock) 
 }
 
 func (d *DatabaseLock) acquireXIntent(txId TransactionId, lock *MultiLevelLock) error {
+	if lock == nil {
+		return nil
+	}
 	lockType := lock.LockType(txId)
 	if lockType == XLock {
 		panic(errors.Errorf("unexpected ancestor lock '%s' while acquiring IX", lockType))

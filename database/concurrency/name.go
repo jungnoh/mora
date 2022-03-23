@@ -3,6 +3,9 @@ package concurrency
 import (
 	"bytes"
 	"hash/fnv"
+	"strconv"
+
+	"github.com/jungnoh/mora/page"
 )
 
 func NewResourceNamePart(value string) ResourceNamePart {
@@ -69,4 +72,25 @@ func (r ResourceName) String() string {
 	}
 	buf.WriteString(">")
 	return buf.String()
+}
+
+func NewMarketResourceName(marketCode string) ResourceName {
+	return NewResourceName([]ResourceNamePart{
+		NewResourceNamePart(marketCode),
+	})
+}
+
+func NewCodeResourceName(marketCode, code string) ResourceName {
+	return NewResourceName([]ResourceNamePart{
+		NewResourceNamePart(marketCode),
+		NewResourceNamePart(code),
+	})
+}
+
+func NewSetResourceName(set page.CandleSet) ResourceName {
+	return NewResourceName([]ResourceNamePart{
+		NewResourceNamePart(set.MarketCode),
+		NewResourceNamePart(set.Code),
+		NewResourceNamePart(strconv.Itoa(int(set.Year))),
+	})
 }

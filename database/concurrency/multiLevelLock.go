@@ -2,6 +2,7 @@ package concurrency
 
 import (
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 // Hierarchy: Market -> Symbol -> Page
@@ -77,6 +78,7 @@ func (m *MultiLevelLock) LockType(txId TransactionId) LockType {
 }
 
 func (m *MultiLevelLock) Acquire(txId TransactionId, lockType LockType) error {
+	log.Debug().Uint64("txId", uint64(txId)).Stringer("resource", m.name).Stringer("type", lockType).Msg("Acquire requested")
 	if m.parent != nil {
 		parentLockType := m.manager.LockType(txId, m.parent.name)
 		if !LockTypesCanBeParent(parentLockType, lockType) {
@@ -94,6 +96,7 @@ func (m *MultiLevelLock) Acquire(txId TransactionId, lockType LockType) error {
 }
 
 func (m *MultiLevelLock) Release(txId TransactionId) error {
+	log.Debug().Uint64("txId", uint64(txId)).Stringer("resource", m.name).Msg("Release requested")
 	if count := m.childrenLockCounter.TransactionCount(txId); count > 0 {
 		return errors.Errorf("trying to release when children are still locked (has %d)", count)
 	}
@@ -107,6 +110,7 @@ func (m *MultiLevelLock) Release(txId TransactionId) error {
 }
 
 func (m *MultiLevelLock) Promote(txId TransactionId, newLockType LockType) error {
+	log.Debug().Uint64("txId", uint64(txId)).Stringer("resource", m.name).Stringer("type", newLockType).Msg("Promotion requested")
 	prevLockType := m.LockType(txId)
 	if prevLockType == newLockType {
 		return errors.New("lock type cannot be same")
@@ -138,6 +142,7 @@ func (m *MultiLevelLock) Promote(txId TransactionId, newLockType LockType) error
 }
 
 func (m *MultiLevelLock) Esclate(txId TransactionId) error {
+	log.Debug().Uint64("txId", uint64(txId)).Stringer("resource", m.name).Msg("Esclation requested")
 	prevLockType := m.LockType(txId)
 	if prevLockType == SLock || prevLockType == XLock {
 		return nil

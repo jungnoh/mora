@@ -5,6 +5,7 @@ import (
 
 	errSlice "github.com/carlmjohnson/errors"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 type LockManager struct {
@@ -24,6 +25,7 @@ func (l *LockManager) getResourceEntry(name ResourceName) *LockEntry {
 }
 
 func (l *LockManager) Acquire(txId TransactionId, name ResourceName, lockType LockType) error {
+	log.Debug().Uint64("txId", uint64(txId)).Stringer("resource", name).Stringer("type", lockType).Msg("Acquire")
 	wantedLock := Lock{Name: name, Transaction: txId, Type: lockType}
 	ack := make(chan bool)
 	resource := l.getResourceEntry(name)
@@ -37,6 +39,7 @@ func (l *LockManager) Acquire(txId TransactionId, name ResourceName, lockType Lo
 }
 
 func (l *LockManager) AcquireThenRelease(txId TransactionId, name ResourceName, lockType LockType, releases []ResourceName) error {
+	log.Debug().Uint64("txId", uint64(txId)).Stringer("resource", name).Stringer("type", lockType).Msg("AcquireThenRelease")
 	for _, release := range releases {
 		if !l.txLocks.ContainsResource(txId, release) {
 			return errors.Errorf("tx does not hold lock on '%s'", release)
@@ -61,6 +64,7 @@ func (l *LockManager) AcquireThenRelease(txId TransactionId, name ResourceName, 
 }
 
 func (l *LockManager) Promote(txId TransactionId, name ResourceName, newLockType LockType) error {
+	log.Debug().Uint64("txId", uint64(txId)).Stringer("resource", name).Stringer("type", newLockType).Msg("Promote")
 	if !l.txLocks.ContainsResource(txId, name) {
 		return errors.New("Transaction does not have lock on this resource")
 	}
@@ -81,6 +85,7 @@ func (l *LockManager) Promote(txId TransactionId, name ResourceName, newLockType
 }
 
 func (l *LockManager) Release(txId TransactionId, name ResourceName) error {
+	log.Debug().Uint64("txId", uint64(txId)).Stringer("resource", name).Msg("Release")
 	if l.txLocks.ContainsResource(txId, name) {
 		return errors.New("Transaction does not have lock on this resource")
 	}
@@ -91,6 +96,7 @@ func (l *LockManager) Release(txId TransactionId, name ResourceName) error {
 }
 
 func (l *LockManager) ReleaseAll(txId TransactionId) error {
+	log.Debug().Uint64("txId", uint64(txId)).Msg("ReleaseAll")
 	var errs errSlice.Slice
 	for _, resource := range l.txLocks.AllResources(txId) {
 		errs.Push(l.Release(txId, resource))

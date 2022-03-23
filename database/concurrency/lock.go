@@ -25,6 +25,13 @@ type TransactionLockMap struct {
 	lock          sync.Mutex
 }
 
+func NewTransactionLockMap() TransactionLockMap {
+	return TransactionLockMap{
+		data:          make(map[TransactionId]map[uint64][]LockType),
+		resourceNames: make(map[uint64]ResourceName),
+	}
+}
+
 func (m *TransactionLockMap) LockTypes(txId TransactionId, name ResourceName) []LockType {
 	m.lock.Lock()
 	defer m.lock.Unlock()

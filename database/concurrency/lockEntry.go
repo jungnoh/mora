@@ -1,6 +1,8 @@
 package concurrency
 
-import "sync"
+import (
+	"sync"
+)
 
 func NewLockEntry(name ResourceName, txLockMap *TransactionLockMap) *LockEntry {
 	return &LockEntry{
@@ -22,9 +24,8 @@ type LockEntry struct {
 func (l *LockEntry) TransactionLockType(txId TransactionId) LockType {
 	l.accessLock.Lock()
 	defer l.accessLock.Unlock()
-
 	lock, ok := l.locks[txId]
-	if ok {
+	if !ok {
 		return NoLock
 	}
 	return lock.Type
