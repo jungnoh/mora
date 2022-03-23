@@ -2,8 +2,6 @@ package command
 
 import (
 	"io"
-
-	"github.com/jungnoh/mora/page"
 )
 
 type CommitCommand struct {
@@ -25,12 +23,12 @@ func (e *CommitCommand) TypeId() CommandType {
 	return CommitCommandType
 }
 
-func (e *CommitCommand) TargetSets() []page.CandleSet {
-	return []page.CandleSet{}
+func (e *CommitCommand) NeededLocks() []NeededLock {
+	return []NeededLock{}
 }
 
-func (e *CommitCommand) Persist(_ PageSetAccessor) error {
-	return nil
+func (e *CommitCommand) Execute(_ PageSetAccessor) (interface{}, error) {
+	return struct{}{}, nil
 }
 
 func (e *CommitCommand) String() string {

@@ -112,44 +112,44 @@ func (w *WalFlusher) processFromDisk(file string) error {
 }
 
 func (w *WalFlusher) flushToMemory(tx *flusherTransaction) error {
-	for _, entry := range tx.Entries {
-		targetSets := entry.Content.TargetSets()
-		minTxId := uint64(0x7fffffffffffffff)
-		for _, set := range targetSets {
-			pageKey := set.UniqueKey()
-			if _, ok := w.loadedPages[pageKey]; !ok {
-				// TODO: Only read header before determining skip
-				lock := w.loadedPagesLock.Get(pageKey)
-				lock.Lock()
-				defer lock.Unlock()
+	// for _, entry := range tx.Entries {
+	// 	targetSets := entry.Content.TargetSets()
+	// 	minTxId := uint64(0x7fffffffffffffff)
+	// 	for _, set := range targetSets {
+	// 		pageKey := set.UniqueKey()
+	// 		if _, ok := w.loadedPages[pageKey]; !ok {
+	// 			// TODO: Only read header before determining skip
+	// 			lock := w.loadedPagesLock.Get(pageKey)
+	// 			lock.Lock()
+	// 			defer lock.Unlock()
 
-				loadedPage, err := w.Disk.Read(set)
-				if err != nil {
-					return errors.Wrapf(err, "failed to load page with key '%s' (tx=%d)", pageKey, tx.TxId)
-				}
-				if loadedPage.IsZero() {
-					loadedPage = page.NewPage(set)
-				}
-				w.loadedPages[pageKey] = &loadedPage
-			}
-			if minTxId > w.loadedPages[pageKey].Header.LastTxId {
-				minTxId = w.loadedPages[pageKey].Header.LastTxId
-			}
-		}
-		if minTxId >= entry.TxID {
-			log.Debug().Uint64("txId", entry.TxID).Stringer("entry", entry.Content).Msg("Skipping log commit")
-			continue
-		}
-		for _, set := range targetSets {
-			pageKey := set.UniqueKey()
-			if w.loadedPages[pageKey].Header.LastTxId < tx.TxId {
-				w.loadedPages[pageKey].Header.LastTxId = tx.TxId
-			}
-		}
-		if err := entry.Content.Persist(&flusherAccessor{f: w}); err != nil {
-			return errors.Wrapf(err, "failed to persist (tx=%d)", tx.TxId)
-		}
-	}
+	// 			loadedPage, err := w.Disk.Read(set)
+	// 			if err != nil {
+	// 				return errors.Wrapf(err, "failed to load page with key '%s' (tx=%d)", pageKey, tx.TxId)
+	// 			}
+	// 			if loadedPage.IsZero() {
+	// 				loadedPage = page.NewPage(set)
+	// 			}
+	// 			w.loadedPages[pageKey] = &loadedPage
+	// 		}
+	// 		if minTxId > w.loadedPages[pageKey].Header.LastTxId {
+	// 			minTxId = w.loadedPages[pageKey].Header.LastTxId
+	// 		}
+	// 	}
+	// 	if minTxId >= entry.TxID {
+	// 		log.Debug().Uint64("txId", entry.TxID).Stringer("entry", entry.Content).Msg("Skipping log commit")
+	// 		continue
+	// 	}
+	// 	for _, set := range targetSets {
+	// 		pageKey := set.UniqueKey()
+	// 		if w.loadedPages[pageKey].Header.LastTxId < tx.TxId {
+	// 			w.loadedPages[pageKey].Header.LastTxId = tx.TxId
+	// 		}
+	// 	}
+	// 	if _, err := entry.Content.Execute(&flusherAccessor{f: w}); err != nil {
+	// 		return errors.Wrapf(err, "failed to persist (tx=%d)", tx.TxId)
+	// 	}
+	// }
 	return nil
 }
 

@@ -2,6 +2,7 @@ package command
 
 import (
 	"github.com/jungnoh/mora/common"
+	"github.com/jungnoh/mora/database/concurrency"
 	"github.com/jungnoh/mora/page"
 )
 
@@ -19,14 +20,19 @@ type Command struct {
 }
 
 type PageSetAccessor interface {
-	Acquire(set page.CandleSet) (func(), error)
-	Get(set page.CandleSet) (*page.Page, error)
+	AcquirePage(set page.CandleSet, exclusive bool) (func(), error)
+	GetPage(set page.CandleSet, exclusive bool) (*page.Page, error)
+}
+
+type NeededLock struct {
+	Lock      concurrency.ResourceName
+	Exclusive bool
 }
 
 type CommandContent interface {
 	common.SizableBinaryReadWriter
 	TypeId() CommandType
-	TargetSets() []page.CandleSet
-	Persist(accessor PageSetAccessor) error
+	NeededLocks() []NeededLock
+	Execute(accessor PageSetAccessor) (interface{}, error)
 	String() string
 }
