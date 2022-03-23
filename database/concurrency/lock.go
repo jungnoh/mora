@@ -1,6 +1,8 @@
 package concurrency
 
-import "sync"
+import (
+	"sync"
+)
 
 type Lock struct {
 	Name        ResourceName
@@ -92,6 +94,22 @@ func (m *TransactionLockMap) ContainsResource(txId TransactionId, name ResourceN
 		return false
 	}
 	return len(m.data[txId][name.hashValue]) > 0
+}
+
+func (m *TransactionLockMap) AddLock(txId TransactionId, name ResourceName, lockType LockType) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if _, ok := m.resourceNames[name.hashValue]; !ok {
+		m.resourceNames[name.hashValue] = name
+	}
+	if _, ok := m.data[txId]; !ok {
+		m.data[txId] = make(map[uint64][]LockType)
+	}
+	if _, ok := m.data[txId][name.hashValue]; !ok {
+		m.data[txId][name.hashValue] = make([]LockType, 0)
+	}
+	m.data[txId][name.hashValue] = append(m.data[txId][name.hashValue], lockType)
 }
 
 func (m *TransactionLockMap) DeleteResource(txId TransactionId, name ResourceName) {

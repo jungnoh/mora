@@ -35,6 +35,7 @@ func (l *LockManager) Acquire(txId TransactionId, name ResourceName, lockType Lo
 	}
 	go resource.AddToQueue(lockRequest{Lock: wantedLock, Ack: ack}, false)
 	<-ack
+	l.txLocks.AddLock(txId, name, lockType)
 	return nil
 }
 
@@ -54,6 +55,7 @@ func (l *LockManager) AcquireThenRelease(txId TransactionId, name ResourceName, 
 	ack := make(chan bool)
 	go resource.AddToQueue(lockRequest{Lock: wantedLock, Ack: ack}, false)
 	<-ack
+	l.txLocks.AddLock(txId, name, lockType)
 
 	for _, release := range releases {
 		if err := l.Release(txId, release); err != nil {

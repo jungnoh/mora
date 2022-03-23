@@ -5,8 +5,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Hierarchy: Market -> Symbol -> Page
-
 type MultiLevelLock struct {
 	name                ResourceName
 	lastNamePart        ResourceNamePart
@@ -41,6 +39,7 @@ func NewMultiLevelLock(manager *LockManager, parent *MultiLevelLock, key Resourc
 	lock := MultiLevelLock{
 		manager:             manager,
 		parent:              parent,
+		lastNamePart:        key,
 		childrenLockCounter: *NewTransactionRefCounter(),
 	}
 	if parent != nil && parent.manager != manager {
@@ -115,7 +114,7 @@ func (m *MultiLevelLock) Promote(txId TransactionId, newLockType LockType) error
 	if prevLockType == newLockType {
 		return errors.New("lock type cannot be same")
 	}
-	if !LockTypesSubstitutable(prevLockType, newLockType) {
+	if !LockTypesSubstitutable(newLockType, prevLockType) {
 		return errors.Errorf("lock types not substitutable (trying to substitute %s to %s)", prevLockType, newLockType)
 	}
 	if m.parent != nil {
