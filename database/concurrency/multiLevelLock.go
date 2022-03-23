@@ -1,6 +1,8 @@
 package concurrency
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
@@ -171,4 +173,19 @@ func (m *MultiLevelLock) Esclate(txId TransactionId) error {
 
 	m.childrenLockCounter.ClearReferences(txId)
 	return nil
+}
+
+func (m *MultiLevelLock) PrintAllLocks() {
+	m.printAllLocks("")
+}
+
+func (m *MultiLevelLock) printAllLocks(heading string) {
+	fmt.Printf("%s%s: ", heading, m.name.String())
+	for txId, lock := range m.manager.getResourceEntry(m.name).locks {
+		fmt.Printf("%d/%s ", txId, lock.Type.String())
+	}
+	fmt.Printf("\n")
+	for _, child := range m.childrenLockCounter.children {
+		child.printAllLocks(heading + " ")
+	}
 }

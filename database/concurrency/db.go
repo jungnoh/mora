@@ -158,3 +158,7 @@ func (d *DatabaseLock) acquireXIntent(txId TransactionId, lock *MultiLevelLock) 
 func (d *DatabaseLock) Free(txId TransactionId) error {
 	return d.manager.ReleaseAll(txId)
 }
+
+func (d *DatabaseLock) PrintAllLocks() {
+	d.lockSet.rootLock.PrintAllLocks()
+}
