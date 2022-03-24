@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/jungnoh/mora/common"
+	"github.com/jungnoh/mora/database/concurrency"
 	"github.com/jungnoh/mora/page"
 	"github.com/pkg/errors"
 )
@@ -92,28 +93,31 @@ func (e *InsertCommand) TypeId() CommandType {
 	return InsertCommandType
 }
 
-func (e *InsertCommand) TargetSets() []page.CandleSet {
-	return []page.CandleSet{
-		e.targetSet(),
+func (e *InsertCommand) NeededLocks() []NeededLock {
+	return []NeededLock{
+		{
+			Lock:      concurrency.NewSetResourceName(e.targetSet()),
+			Exclusive: true,
+		},
 	}
 }
 
-func (e *InsertCommand) Persist(accessor PageSetAccessor) error {
+func (e *InsertCommand) Execute(accessor PageSetAccessor) (interface{}, error) {
 	pageKey := e.targetSet().UniqueKey()
-	unlock, err := accessor.Acquire(e.targetSet())
+	unlock, err := accessor.AcquirePage(e.targetSet(), true)
 	if err != nil {
-		return errors.Wrapf(err, "InsertCommand: acquire failed (key '%s')", pageKey)
+		return struct{}{}, errors.Wrapf(err, "InsertCommand: acquire failed (key '%s')", pageKey)
 	}
 	defer unlock()
 
-	page, err := accessor.Get(e.targetSet())
+	page, err := accessor.GetPage(e.targetSet(), true)
 	if err != nil {
-		return errors.Wrapf(err, "InsertCommand: page load failed (key '%s')", pageKey)
+		return struct{}{}, errors.Wrapf(err, "InsertCommand: page load failed (key '%s')", pageKey)
 	}
 	if err := page.Add(common.TimestampCandleList(e.Candles).ToCandleList()); err != nil {
-		return errors.Wrapf(err, "InsertCommand: failed (key '%s')", pageKey)
+		return struct{}{}, errors.Wrapf(err, "InsertCommand: failed (key '%s')", pageKey)
 	}
-	return nil
+	return struct{}{}, nil
 }
 
 func (e *InsertCommand) targetSet() page.CandleSet {

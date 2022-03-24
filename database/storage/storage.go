@@ -69,7 +69,6 @@ func (s *Storage) Access() (StorageAccessor, error) {
 		storage:  s,
 		started:  false,
 		finished: false,
-		todo:     make(map[string]accessorNeededPage),
 		readers:  make(map[string]*memImpl.MemoryReader),
 		writers:  make(map[string]*memImpl.MemoryWriter),
 	}
