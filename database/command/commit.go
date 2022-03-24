@@ -23,8 +23,10 @@ func (e *CommitCommand) TypeId() CommandType {
 	return CommitCommandType
 }
 
-func (e *CommitCommand) NeededLocks() []NeededLock {
-	return []NeededLock{}
+func (e *CommitCommand) Plan() CommandPlan {
+	return CommandPlan{
+		NeededLocks: []NeededLock{},
+	}
 }
 
 func (e *CommitCommand) Execute(_ PageSetAccessor) (interface{}, error) {

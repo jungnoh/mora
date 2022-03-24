@@ -1,6 +1,8 @@
 package database
 
 import (
+	"sort"
+
 	errSlice "github.com/carlmjohnson/errors"
 	"github.com/jungnoh/mora/database/command"
 	"github.com/jungnoh/mora/database/concurrency"
@@ -30,8 +32,9 @@ func (t *TransactionContext) Start() error {
 }
 
 func (t *TransactionContext) Execute(cmd command.CommandContent) (interface{}, error) {
-	neededLocks := cmd.NeededLocks()
-	for _, lock := range neededLocks {
+	plan := cmd.Plan()
+	sort.Sort(plan.NeededLocks)
+	for _, lock := range plan.NeededLocks {
 		lockType := concurrency.SLock
 		if lock.Exclusive {
 			lockType = concurrency.XLock

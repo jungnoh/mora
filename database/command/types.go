@@ -19,6 +19,10 @@ type Command struct {
 	Content CommandContent
 }
 
+type CommandPlan struct {
+	NeededLocks NeededLockSlice
+}
+
 type PageSetAccessor interface {
 	AcquirePage(set page.CandleSet, exclusive bool) (func(), error)
 	GetPage(set page.CandleSet, exclusive bool) (*page.Page, error)
@@ -29,10 +33,22 @@ type NeededLock struct {
 	Exclusive bool
 }
 
+type NeededLockSlice []NeededLock
+
+func (n NeededLockSlice) Len() int {
+	return len(n)
+}
+func (n NeededLockSlice) Swap(i, j int) {
+	n[i], n[j] = n[j], n[i]
+}
+func (n NeededLockSlice) Less(i, j int) bool {
+	return n[i].Lock.Hash() < n[j].Lock.Hash()
+}
+
 type CommandContent interface {
 	common.SizableBinaryReadWriter
 	TypeId() CommandType
-	NeededLocks() []NeededLock
+	Plan() CommandPlan
 	Execute(accessor PageSetAccessor) (interface{}, error)
 	String() string
 }

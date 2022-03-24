@@ -93,11 +93,13 @@ func (e *InsertCommand) TypeId() CommandType {
 	return InsertCommandType
 }
 
-func (e *InsertCommand) NeededLocks() []NeededLock {
-	return []NeededLock{
-		{
-			Lock:      concurrency.NewSetResourceName(e.targetSet()),
-			Exclusive: true,
+func (e *InsertCommand) Plan() CommandPlan {
+	return CommandPlan{
+		NeededLocks: []NeededLock{
+			{
+				Lock:      concurrency.NewSetResourceName(e.targetSet()),
+				Exclusive: true,
+			},
 		},
 	}
 }
