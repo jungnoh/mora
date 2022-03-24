@@ -24,14 +24,33 @@ func (f *flusherTransaction) AddEntry(e command.Command) {
 }
 
 type flusherAccessor struct {
-	f *WalFlusher
+	f    *WalFlusher
+	txId uint64
 }
 
-func (a *flusherAccessor) Acquire(set page.CandleSet) (func(), error) {
+func (a *flusherAccessor) AcquirePage(set page.CandleSet, exclusive bool) (func(), error) {
+	pageKey := set.UniqueKey()
+	if _, ok := a.f.loadedPages[pageKey]; !ok {
+		lock := a.f.loadedPagesLock.Get(pageKey)
+		lock.Lock()
+		defer lock.Unlock()
+
+		loadedPage, err := a.f.Disk.Read(set)
+		if err != nil {
+			return func() {}, errors.Wrapf(err, "failed to load page with key '%s' (tx=%d)", pageKey, a.txId)
+		}
+		if loadedPage.IsZero() {
+			loadedPage = page.NewPage(set)
+		}
+		a.f.loadedPages[pageKey] = &loadedPage
+	}
+	if a.f.loadedPages[pageKey].Header.LastTxId < a.txId {
+		a.f.loadedPages[pageKey].Header.LastTxId = a.txId
+	}
 	return func() {}, nil
 }
 
-func (a *flusherAccessor) Get(set page.CandleSet) (*page.Page, error) {
+func (a *flusherAccessor) GetPage(set page.CandleSet, exclusive bool) (*page.Page, error) {
 	return a.f.loadedPages[set.UniqueKey()], nil
 }
 
@@ -112,44 +131,12 @@ func (w *WalFlusher) processFromDisk(file string) error {
 }
 
 func (w *WalFlusher) flushToMemory(tx *flusherTransaction) error {
-	// for _, entry := range tx.Entries {
-	// 	targetSets := entry.Content.TargetSets()
-	// 	minTxId := uint64(0x7fffffffffffffff)
-	// 	for _, set := range targetSets {
-	// 		pageKey := set.UniqueKey()
-	// 		if _, ok := w.loadedPages[pageKey]; !ok {
-	// 			// TODO: Only read header before determining skip
-	// 			lock := w.loadedPagesLock.Get(pageKey)
-	// 			lock.Lock()
-	// 			defer lock.Unlock()
-
-	// 			loadedPage, err := w.Disk.Read(set)
-	// 			if err != nil {
-	// 				return errors.Wrapf(err, "failed to load page with key '%s' (tx=%d)", pageKey, tx.TxId)
-	// 			}
-	// 			if loadedPage.IsZero() {
-	// 				loadedPage = page.NewPage(set)
-	// 			}
-	// 			w.loadedPages[pageKey] = &loadedPage
-	// 		}
-	// 		if minTxId > w.loadedPages[pageKey].Header.LastTxId {
-	// 			minTxId = w.loadedPages[pageKey].Header.LastTxId
-	// 		}
-	// 	}
-	// 	if minTxId >= entry.TxID {
-	// 		log.Debug().Uint64("txId", entry.TxID).Stringer("entry", entry.Content).Msg("Skipping log commit")
-	// 		continue
-	// 	}
-	// 	for _, set := range targetSets {
-	// 		pageKey := set.UniqueKey()
-	// 		if w.loadedPages[pageKey].Header.LastTxId < tx.TxId {
-	// 			w.loadedPages[pageKey].Header.LastTxId = tx.TxId
-	// 		}
-	// 	}
-	// 	if _, err := entry.Content.Execute(&flusherAccessor{f: w}); err != nil {
-	// 		return errors.Wrapf(err, "failed to persist (tx=%d)", tx.TxId)
-	// 	}
-	// }
+	for _, entry := range tx.Entries {
+		// TODO: Skip if possible
+		if _, err := entry.Content.Execute(&flusherAccessor{f: w, txId: tx.TxId}); err != nil {
+			return errors.Wrapf(err, "failed to persist (tx=%d)", tx.TxId)
+		}
+	}
 	return nil
 }
 
